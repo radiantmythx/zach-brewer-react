@@ -1,73 +1,56 @@
-# React + TypeScript + Vite
+# Zach Brewer Personal Site
 
-This template provides a minimal setup to get React working in Vite with HMR and some ESLint rules.
+A modern personal portfolio built with React, TypeScript, and Vite.
 
-Currently, two official plugins are available:
+This site is designed to feel clean, fast, and human. It showcases projects, work experience, and contact information, and includes an in-site Resume viewer modal with zoom, drag-to-pan, page controls, and one-click download.
 
-- [@vitejs/plugin-react](https://github.com/vitejs/vite-plugin-react/blob/main/packages/plugin-react) uses [Oxc](https://oxc.rs)
-- [@vitejs/plugin-react-swc](https://github.com/vitejs/vite-plugin-react/blob/main/packages/plugin-react-swc) uses [SWC](https://swc.rs/)
+## Highlights
 
-## React Compiler
+- Built with React + TypeScript + Vite for a snappy experience
+- Custom navigation and section-based portfolio layout
+- Interactive Resume modal (no external page routing)
+- PDF controls: zoom buttons, zoom slider, reset view, page navigation, drag-to-pan
+- Mobile-friendly behavior so the Resume stays readable on smaller screens
 
-The React Compiler is not enabled on this template because of its impact on dev & build performances. To add it, see [this documentation](https://react.dev/learn/react-compiler/installation).
+## Tech Stack
 
-## Expanding the ESLint configuration
+- React
+- TypeScript
+- Vite
+- pdfjs-dist
 
-If you are developing a production application, we recommend updating the configuration to enable type-aware lint rules:
+## Getting Started
 
-```js
-export default defineConfig([
-  globalIgnores(['dist']),
-  {
-    files: ['**/*.{ts,tsx}'],
-    extends: [
-      // Other configs...
+1. Install dependencies
 
-      // Remove tseslint.configs.recommended and replace with this
-      tseslint.configs.recommendedTypeChecked,
-      // Alternatively, use this for stricter rules
-      tseslint.configs.strictTypeChecked,
-      // Optionally, add this for stylistic rules
-      tseslint.configs.stylisticTypeChecked,
+   npm install
 
-      // Other configs...
-    ],
-    languageOptions: {
-      parserOptions: {
-        project: ['./tsconfig.node.json', './tsconfig.app.json'],
-        tsconfigRootDir: import.meta.dirname,
-      },
-      // other options...
-    },
-  },
-])
-```
+2. Run development server
 
-You can also install [eslint-plugin-react-x](https://github.com/Rel1cx/eslint-react/tree/main/packages/plugins/eslint-plugin-react-x) and [eslint-plugin-react-dom](https://github.com/Rel1cx/eslint-react/tree/main/packages/plugins/eslint-plugin-react-dom) for React-specific lint rules:
+   npm run dev
 
-```js
-// eslint.config.js
-import reactX from 'eslint-plugin-react-x'
-import reactDom from 'eslint-plugin-react-dom'
+3. Build for production
 
-export default defineConfig([
-  globalIgnores(['dist']),
-  {
-    files: ['**/*.{ts,tsx}'],
-    extends: [
-      // Other configs...
-      // Enable lint rules for React
-      reactX.configs['recommended-typescript'],
-      // Enable lint rules for React DOM
-      reactDom.configs.recommended,
-    ],
-    languageOptions: {
-      parserOptions: {
-        project: ['./tsconfig.node.json', './tsconfig.app.json'],
-        tsconfigRootDir: import.meta.dirname,
-      },
-      // other options...
-    },
-  },
-])
-```
+   npm run build
+
+## Resume File Location
+
+The live Resume used by the modal is served from:
+
+public/resume/resume.pdf
+
+If you want to replace the Resume, swap that file with your updated PDF and restart the dev server if needed.
+
+## Available Scripts
+
+- npm run dev: start local development server
+- npm run build: type-check and create production build
+- npm run build:all: build demo assets and this site build
+
+## Notes
+
+This project currently tracks generated demo assets under public/demo for deployment convenience.
+
+---
+
+Built with care to be pleasant to explore, easy to maintain, and fun to keep improving.
