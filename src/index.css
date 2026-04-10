@@ -1,0 +1,76 @@
+@import url('https://fonts.googleapis.com/css2?family=Inter:ital,opsz,wght@0,14..32,300;0,14..32,400;0,14..32,500;1,14..32,300&family=Cormorant+Garamond:ital,wght@0,600;0,700;1,600;1,700&family=Fraunces:ital,opsz,wght@0,9..144,600;0,9..144,700;1,9..144,600;1,9..144,700&display=swap');
+
+@import "tailwindcss";
+
+@theme {
+  --font-sans: 'Inter', system-ui, sans-serif;
+  --font-display: 'Fraunces', Georgia, serif;
+  --font-display-alt: 'Cormorant Garamond', Georgia, serif;
+
+  --color-white: #ffffff;
+  --color-off-white: #f9f9f7;
+  --color-ink: #080808;
+  --color-ink-muted: #646464;
+  --color-ink-subtle: #b8b8b8;
+  --color-accent: #0a0aff;
+  --color-accent-violet: #6600ff;
+  --color-surface: #f4f4f2;
+
+  --ease-expo: cubic-bezier(0.16, 1, 0.3, 1);
+  --ease-out: cubic-bezier(0.0, 0, 0.2, 1);
+}
+
+*,
+*::before,
+*::after {
+  box-sizing: border-box;
+  margin: 0;
+  padding: 0;
+}
+
+html {
+  scroll-behavior: smooth;
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
+  text-rendering: optimizeLegibility;
+}
+
+body {
+  font-family: var(--font-sans);
+  background-color: var(--color-white);
+  color: var(--color-ink);
+  overflow-x: hidden;
+  line-height: 1.6;
+}
+
+::selection {
+  background-color: var(--color-accent);
+  color: var(--color-white);
+}
+
+/* Work section responsive */
+@media (max-width: 640px) {
+  .project-row {
+    grid-template-columns: 1fr !important;
+    gap: 1rem !important;
+    padding-left: 0 !important;
+  }
+  .project-index {
+    display: none !important;
+  }
+  .project-tags {
+    overflow-x: auto;
+    flex-wrap: nowrap !important;
+    -webkit-overflow-scrolling: touch;
+    scrollbar-width: none;
+  }
+  .project-tags::-webkit-scrollbar {
+    display: none;
+  }
+  .project-actions {
+    flex-wrap: wrap;
+  }
+  .project-year {
+    display: none !important;
+  }
+}
