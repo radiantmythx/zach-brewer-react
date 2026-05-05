@@ -7,7 +7,7 @@
     "dev": "vite",
     "build": "tsc -b && vite build",
     "build:all": "npm run build:demo && npm run build",
-    "build:demo": "cd ../survivor-react-engine && npm run build && xcopy /E /I /Y dist ..\\personal-site\\public\\demo",
+    "build:demo": "node ./scripts/build-demos.mjs",
     "lint": "eslint .",
     "preview": "vite preview"
   },

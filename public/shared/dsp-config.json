@@ -1,0 +1,15 @@
+{
+  "version": 1,
+  "eqBandsHz": [31, 62, 125, 250, 500, 1000, 2000, 4000, 8000, 16000],
+  "ranges": {
+    "eqGainDb": { "min": -12, "max": 12, "step": 0.5 },
+    "preampDb": { "min": -12, "max": 6, "step": 0.5 },
+    "delayFeedback": { "min": 0.0, "max": 0.85, "step": 0.01 },
+    "wetMix": { "min": 0.0, "max": 1.0, "step": 0.01 }
+  },
+  "defaults": {
+    "eqGainsDb": [0, 0, 0, 0, 0, 0, 0, 0, 0, 0],
+    "preampDb": -3,
+    "bypass": false
+  }
+}

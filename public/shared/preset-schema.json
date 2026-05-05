@@ -1,0 +1,19 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "title": "EQ Anywhere Preset",
+  "type": "object",
+  "required": ["name", "version", "eqGainsDb", "preampDb", "bypass"],
+  "properties": {
+    "name": { "type": "string", "minLength": 1 },
+    "version": { "type": "integer", "minimum": 1 },
+    "eqGainsDb": {
+      "type": "array",
+      "minItems": 10,
+      "maxItems": 10,
+      "items": { "type": "number", "minimum": -12, "maximum": 12 }
+    },
+    "preampDb": { "type": "number", "minimum": -12, "maximum": 6 },
+    "bypass": { "type": "boolean" }
+  },
+  "additionalProperties": false
+}

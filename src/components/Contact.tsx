@@ -1,3 +1,5 @@
+import { useEffect, useState } from 'react'
+
 const socialLinks = [
   { label: 'GitHub', href: 'https://github.com/radiantmythx' },
   { label: 'LinkedIn', href: 'https://www.linkedin.com/in/zachary-brewer-88653269/' },
@@ -6,6 +8,17 @@ const socialLinks = [
 
 export default function Contact() {
   const year = new Date().getFullYear()
+  const [isMobile, setIsMobile] = useState(false)
+
+  useEffect(() => {
+    const mediaQuery = window.matchMedia('(max-width: 820px)')
+    const handleViewportChange = () => setIsMobile(mediaQuery.matches)
+
+    handleViewportChange()
+    mediaQuery.addEventListener('change', handleViewportChange)
+
+    return () => mediaQuery.removeEventListener('change', handleViewportChange)
+  }, [])
 
   return (
     <section
@@ -50,7 +63,7 @@ export default function Contact() {
         }}
       >
         {/* CTA block */}
-        <div style={{ marginBottom: '7rem' }}>
+        <div style={{ marginBottom: '7rem', textAlign: isMobile ? 'center' : 'left' }}>
           <p
             style={{
               fontSize: '0.75rem',
@@ -74,6 +87,8 @@ export default function Contact() {
               color: 'var(--color-white)',
               marginBottom: '2.5rem',
               maxWidth: '14ch',
+              marginLeft: isMobile ? 'auto' : 0,
+              marginRight: isMobile ? 'auto' : 0,
             }}
           >
             Let’s ship something great.
@@ -83,6 +98,7 @@ export default function Contact() {
             style={{
               display: 'inline-flex',
               alignItems: 'center',
+              justifyContent: 'center',
               gap: '0.75rem',
               fontSize: '0.9375rem',
               fontWeight: 500,
@@ -92,6 +108,10 @@ export default function Contact() {
               padding: '0.875rem 1.75rem',
               borderRadius: '99px',
               transition: 'background 0.25s, border-color 0.25s',
+              marginLeft: isMobile ? 'auto' : 0,
+              marginRight: isMobile ? 'auto' : 0,
+              maxWidth: '100%',
+              textAlign: 'center',
             }}
             onMouseEnter={(e) => {
               e.currentTarget.style.background = 'rgba(255,255,255,0.1)'
@@ -116,9 +136,10 @@ export default function Contact() {
             paddingTop: '2.5rem',
             display: 'flex',
             alignItems: 'center',
-            justifyContent: 'space-between',
+            justifyContent: isMobile ? 'center' : 'space-between',
             flexWrap: 'wrap',
             gap: '1.5rem',
+            textAlign: isMobile ? 'center' : 'left',
           }}
         >
           <span
@@ -137,6 +158,8 @@ export default function Contact() {
               display: 'flex',
               gap: '2rem',
               flexWrap: 'wrap',
+              justifyContent: isMobile ? 'center' : 'flex-start',
+              width: isMobile ? '100%' : 'auto',
             }}
           >
             {socialLinks.map((link) => (

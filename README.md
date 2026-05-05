@@ -49,7 +49,14 @@ If you want to replace the Resume, swap that file with your updated PDF and rest
 
 ## Notes
 
-This project currently tracks generated demo assets under public/demo for deployment convenience.
+This project tracks generated demo assets in `public/` for deployment convenience:
+
+- `public/demo` (Survivor React Engine)
+- `public/demo-equalization-anywhere` (EQ Anywhere site demo)
+- `public/demo-nitro-type` (Nitro Type Trainer)
+- `public/demo-timing-trainer` (Timing Trainer)
+
+Run `npm run build:demo` to rebuild these demo bundles, or `npm run build:all` to rebuild demos and then this site.
 
 ---
 
