@@ -4,14 +4,76 @@
     <meta charset="UTF-8" />
     <link rel="icon" type="image/svg+xml" href="/favicon.svg" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-    <meta name="description" content="Zach Brewer — Designer and developer building products at the intersection of design and engineering." />
-    <meta property="og:title" content="Zach Brewer" />
-    <meta property="og:description" content="Designer and developer building products at the intersection of design and engineering." />
-    <meta property="og:url" content="https://zachbrewer.com" />
-    <title>Zach Brewer</title>
+    <meta name="color-scheme" content="dark" />
+    <meta name="theme-color" content="#08080a" />
+
+    <title>Zach Brewer — Software Engineer</title>
+    <meta
+      name="description"
+      content="Zach Brewer is a software engineer with 10+ years of experience across enterprise finance, full-stack web, and game development — currently AVP and Software Engineer at U.S. Bank."
+    />
+    <meta name="author" content="Zach Brewer" />
+    <meta name="robots" content="index, follow, max-image-preview:large" />
+    <link rel="canonical" href="https://zachbrewer.com/" />
+
+    <!-- Open Graph -->
+    <meta property="og:type" content="website" />
+    <meta property="og:site_name" content="Zach Brewer" />
+    <meta property="og:title" content="Zach Brewer — Software Engineer" />
+    <meta
+      property="og:description"
+      content="Software engineer with 10+ years across enterprise finance, full-stack web, and game development. Currently AVP and Software Engineer at U.S. Bank."
+    />
+    <meta property="og:url" content="https://zachbrewer.com/" />
+    <meta property="og:image" content="https://zachbrewer.com/og-image.jpg" />
+    <meta property="og:image:type" content="image/jpeg" />
+    <meta property="og:image:width" content="1200" />
+    <meta property="og:image:height" content="630" />
+    <meta property="og:image:alt" content="Zach Brewer — Software Engineer. Enterprise, Web, AI." />
+
+    <!-- Twitter -->
+    <meta name="twitter:card" content="summary_large_image" />
+    <meta name="twitter:title" content="Zach Brewer — Software Engineer" />
+    <meta
+      name="twitter:description"
+      content="Software engineer with 10+ years across enterprise finance, full-stack web, and game development."
+    />
+    <meta name="twitter:image" content="https://zachbrewer.com/og-image.jpg" />
+    <meta name="twitter:image:alt" content="Zach Brewer — Software Engineer. Enterprise, Web, AI." />
+
+    <!-- Structured data: Person -->
+    <script type="application/ld+json">
+      {
+        "@context": "https://schema.org",
+        "@type": "Person",
+        "name": "Zach Brewer",
+        "url": "https://zachbrewer.com/",
+        "jobTitle": "Software Engineer, Assistant Vice President",
+        "worksFor": { "@type": "Organization", "name": "U.S. Bank" },
+        "address": {
+          "@type": "PostalAddress",
+          "addressLocality": "St. Louis Park",
+          "addressRegion": "MN",
+          "addressCountry": "US"
+        },
+        "knowsAbout": [
+          "Software Engineering",
+          "C#",
+          "React",
+          "TypeScript",
+          "Cloud Infrastructure",
+          "Artificial Intelligence",
+          "Game Development"
+        ],
+        "sameAs": [
+          "https://github.com/radiantmythx",
+          "https://www.linkedin.com/in/zachary-brewer-88653269/"
+        ]
+      }
+    </script>
   </head>
   <body>
-    <div id="root"></div>
-    <script type="module" src="/src/main.tsx"></script>
+    <div id="root"><!--app-html--></div>
+    <script type="module" src="/src/entry-client.tsx"></script>
   </body>
 </html>

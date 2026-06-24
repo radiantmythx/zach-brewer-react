@@ -1,6 +1,15 @@
 const skills = [
-  'C#', 'React', 'TypeScript', 'JavaScript',
-  'Azure DevOps', 'Tailwind CSS', 'PostCSS', 'Godot',
+  'C# / .NET', 'React', 'TypeScript', 'GraphQL',
+  'Java', 'Python', 'SQL Server', 'Node.js',
+  'Azure', 'Azure DevOps', 'Jenkins', 'Selenium',
+  'Datadog', 'Splunk', 'GitHub Copilot', 'Godot',
+]
+
+const facts = [
+  { label: 'Based in', value: 'Hopkins, MN' },
+  { label: 'Currently', value: 'U.S. Bank — AVP' },
+  { label: 'Experience', value: '10 years' },
+  { label: 'Focus', value: 'Enterprise · Web · AI' },
 ]
 
 export default function About() {
@@ -8,115 +17,93 @@ export default function About() {
     <section
       id="about"
       style={{
-        background: 'var(--color-off-white)',
-        padding: '8rem 0',
-        borderTop: '1px solid rgba(0,0,0,0.07)',
-        borderBottom: '1px solid rgba(0,0,0,0.07)',
+        background: 'var(--color-bg-elev)',
+        padding: '9rem 0',
+        borderTop: '1px solid var(--color-border)',
+        borderBottom: '1px solid var(--color-border)',
       }}
     >
       <div
+        className="two-col"
         style={{
-          maxWidth: '1280px',
+          maxWidth: '1240px',
           margin: '0 auto',
           padding: '0 2rem',
           display: 'grid',
-          gridTemplateColumns: 'repeat(auto-fit, minmax(min(100%, 520px), 1fr))',
+          gridTemplateColumns: '1.1fr 0.9fr',
           gap: '5rem',
           alignItems: 'start',
         }}
       >
         {/* Left: text */}
         <div>
-          <p
-            style={{
-              fontSize: '0.75rem',
-              fontWeight: 500,
-              letterSpacing: '0.12em',
-              textTransform: 'uppercase',
-              color: 'var(--color-ink-subtle)',
-              marginBottom: '1.75rem',
-            }}
-          >
+          <p className="eyebrow" style={{ marginBottom: '1.75rem' }}>
             About
           </p>
           <h2
             style={{
               fontFamily: 'var(--font-display)',
-              fontWeight: 700,
-              fontStyle: 'italic',
-              fontSize: 'clamp(2rem, 4vw, 3.25rem)',
-              lineHeight: 1.05,
-              letterSpacing: '-0.01em',
-              color: 'var(--color-ink)',
+              fontWeight: 600,
+              fontSize: 'clamp(1.9rem, 4vw, 3rem)',
+              lineHeight: 1.1,
+              letterSpacing: '-0.02em',
+              color: 'var(--color-text)',
               marginBottom: '2rem',
             }}
           >
-            Spirited.
+            Craft-obsessed,
             <br />
-            Craft-obsessed.
+            <span className="accent-gradient">end to end.</span>
           </h2>
           <p
             style={{
-              fontSize: '1rem',
+              fontSize: '1.05rem',
               fontWeight: 300,
-              color: 'var(--color-ink-muted)',
+              color: 'var(--color-text-muted)',
               lineHeight: 1.75,
               marginBottom: '1.25rem',
-              maxWidth: '48ch',
+              maxWidth: '52ch',
             }}
           >
-            I’m Zach Brewer — a software engineer with 10 years of experience
-            across enterprise finance, full-stack web, and game development.
+            I'm a software engineer with 10 years of experience designing,
+            building, and automating enterprise-scale systems across financial
+            services — from mainframe-to-cloud migrations to full-stack platforms.
             Currently a Software Engineer and Assistant Vice President at U.S. Bank.
           </p>
           <p
             style={{
-              fontSize: '1rem',
+              fontSize: '1.05rem',
               fontWeight: 300,
-              color: 'var(--color-ink-muted)',
+              color: 'var(--color-text-muted)',
               lineHeight: 1.75,
-              maxWidth: '48ch',
+              maxWidth: '52ch',
             }}
           >
-            I’m deeply passionate about mastering every craft I touch — from
-            production-grade C# and cloud infrastructure to React game engines
-            and modern AI solutions. If it’s interesting, I’m all in.
+            I led GitHub Copilot adoption across our engineering org and care
+            deeply about every layer I touch — production C# and cloud
+            infrastructure, modern React, and the new frontier of AI-assisted
+            development. If it's interesting, I'm all in.
           </p>
         </div>
 
-        {/* Right: skills + details */}
-        <div style={{ paddingTop: '3.5rem' }}>
-          <p
-            style={{
-              fontSize: '0.75rem',
-              fontWeight: 500,
-              letterSpacing: '0.12em',
-              textTransform: 'uppercase',
-              color: 'var(--color-ink-subtle)',
-              marginBottom: '1.25rem',
-            }}
-          >
+        {/* Right: skills + facts */}
+        <div>
+          <p className="eyebrow" style={{ marginBottom: '1.25rem' }}>
             Toolkit
           </p>
-          <div
-            style={{
-              display: 'flex',
-              flexWrap: 'wrap',
-              gap: '0.5rem',
-              marginBottom: '3.5rem',
-            }}
-          >
+          <div style={{ display: 'flex', flexWrap: 'wrap', gap: '0.5rem', marginBottom: '3rem' }}>
             {skills.map((skill) => (
               <span
                 key={skill}
                 style={{
-                  fontSize: '0.8125rem',
-                  fontWeight: 400,
-                  color: 'var(--color-ink)',
-                  border: '1px solid rgba(0,0,0,0.12)',
-                  padding: '0.35rem 0.875rem',
-                  borderRadius: '99px',
-                  background: 'white',
+                  fontFamily: 'var(--font-mono)',
+                  fontSize: '0.74rem',
+                  letterSpacing: '0.02em',
+                  color: 'var(--color-text)',
+                  border: '1px solid var(--color-border)',
+                  padding: '0.35rem 0.75rem',
+                  borderRadius: '7px',
+                  background: 'var(--color-bg-elev-2)',
                 }}
               >
                 {skill}
@@ -124,39 +111,13 @@ export default function About() {
             ))}
           </div>
 
-          <div
-            style={{
-              display: 'grid',
-              gridTemplateColumns: '1fr 1fr',
-              gap: '2rem 3rem',
-            }}
-          >
-            {[
-              { label: 'Based in', value: 'St. Louis Park, MN' },
-              { label: 'Currently', value: 'U.S. Bank — AVP' },
-              { label: 'Experience', value: '10+ years' },
-              { label: 'Focus', value: 'Enterprise · Web · AI' },
-            ].map(({ label, value }) => (
+          <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '2rem 2.5rem' }}>
+            {facts.map(({ label, value }) => (
               <div key={label}>
-                <p
-                  style={{
-                    fontSize: '0.6875rem',
-                    fontWeight: 500,
-                    letterSpacing: '0.1em',
-                    textTransform: 'uppercase',
-                    color: 'var(--color-ink-subtle)',
-                    marginBottom: '0.25rem',
-                  }}
-                >
+                <p className="eyebrow" style={{ fontSize: '0.66rem', marginBottom: '0.4rem' }}>
                   {label}
                 </p>
-                <p
-                  style={{
-                    fontSize: '0.9375rem',
-                    fontWeight: 400,
-                    color: 'var(--color-ink)',
-                  }}
-                >
+                <p style={{ fontSize: '0.95rem', fontWeight: 400, color: 'var(--color-text)' }}>
                   {value}
                 </p>
               </div>

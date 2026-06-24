@@ -5,7 +5,7 @@ interface NavProps {
 }
 
 const links = [
-  { label: 'Work', href: '#work' },
+  { label: 'Experience', href: '#experience' },
   { label: 'About', href: '#about' },
   { label: 'Contact', href: '#contact' },
   { label: 'Resume', href: '#resume' },
@@ -56,19 +56,19 @@ export default function Nav({ onResumeClick }: NavProps) {
         left: 0,
         right: 0,
         zIndex: 50,
-        transition: 'background 0.4s cubic-bezier(0.16,1,0.3,1), border-color 0.4s cubic-bezier(0.16,1,0.3,1)',
-        background: scrolled ? 'rgba(255,255,255,0.85)' : 'transparent',
-        backdropFilter: scrolled ? 'blur(16px) saturate(180%)' : 'none',
-        WebkitBackdropFilter: scrolled ? 'blur(16px) saturate(180%)' : 'none',
-        borderBottom: scrolled ? '1px solid rgba(0,0,0,0.07)' : '1px solid transparent',
+        transition: 'background 0.4s var(--ease-expo), border-color 0.4s var(--ease-expo)',
+        background: scrolled ? 'rgba(8,8,10,0.72)' : 'transparent',
+        backdropFilter: scrolled ? 'blur(16px) saturate(160%)' : 'none',
+        WebkitBackdropFilter: scrolled ? 'blur(16px) saturate(160%)' : 'none',
+        borderBottom: scrolled ? '1px solid var(--color-border)' : '1px solid transparent',
       }}
     >
       <nav
         style={{
-          maxWidth: '1280px',
+          maxWidth: '1240px',
           margin: '0 auto',
-          padding: isMobile ? '0 1rem' : '0 2rem',
-          height: '64px',
+          padding: isMobile ? '0 1.25rem' : '0 2rem',
+          height: '68px',
           display: 'flex',
           alignItems: 'center',
           justifyContent: 'space-between',
@@ -78,18 +78,31 @@ export default function Nav({ onResumeClick }: NavProps) {
         {/* Wordmark */}
         <a
           href="#hero"
+          aria-label="Zach Brewer — home"
           style={{
             fontFamily: 'var(--font-display)',
             fontWeight: 700,
-            fontStyle: 'italic',
-            fontSize: '1.25rem',
-            letterSpacing: '0.01em',
-            color: 'var(--color-ink)',
+            fontSize: '1.15rem',
+            letterSpacing: '0.02em',
+            color: 'var(--color-text)',
             textDecoration: 'none',
             userSelect: 'none',
+            display: 'inline-flex',
+            alignItems: 'center',
+            gap: '0.5rem',
           }}
         >
-          ZB
+          <span
+            aria-hidden="true"
+            style={{
+              width: '8px',
+              height: '8px',
+              borderRadius: '50%',
+              background: 'linear-gradient(120deg, var(--color-accent-bright), var(--color-accent-cyan))',
+              boxShadow: '0 0 12px rgba(124,107,255,0.7)',
+            }}
+          />
+          Zach Brewer
         </a>
 
         {isMobile ? (
@@ -106,13 +119,14 @@ export default function Nav({ onResumeClick }: NavProps) {
                 width: '42px',
                 height: '42px',
                 borderRadius: '10px',
-                border: '1px solid rgba(0,0,0,0.1)',
-                background: 'rgba(255,255,255,0.9)',
-                color: 'var(--color-ink)',
+                border: '1px solid var(--color-border-strong)',
+                background: 'rgba(255,255,255,0.04)',
+                color: 'var(--color-text)',
                 cursor: 'pointer',
+                fontSize: '1.1rem',
               }}
             >
-              {menuOpen ? 'x' : '≡'}
+              {menuOpen ? '✕' : '≡'}
             </button>
 
             {menuOpen && (
@@ -120,17 +134,17 @@ export default function Nav({ onResumeClick }: NavProps) {
                 style={{
                   listStyle: 'none',
                   position: 'absolute',
-                  top: '56px',
+                  top: '60px',
                   right: '0',
-                  width: 'min(260px, calc(100vw - 2rem))',
+                  width: 'min(260px, calc(100vw - 2.5rem))',
                   margin: 0,
                   padding: '0.5rem',
                   borderRadius: '14px',
-                  border: '1px solid rgba(0,0,0,0.08)',
-                  background: 'rgba(255,255,255,0.95)',
-                  backdropFilter: 'blur(10px)',
-                  WebkitBackdropFilter: 'blur(10px)',
-                  boxShadow: '0 16px 30px rgba(0,0,0,0.12)',
+                  border: '1px solid var(--color-border)',
+                  background: 'rgba(16,16,19,0.96)',
+                  backdropFilter: 'blur(12px)',
+                  WebkitBackdropFilter: 'blur(12px)',
+                  boxShadow: '0 24px 48px rgba(0,0,0,0.5)',
                   display: 'flex',
                   flexDirection: 'column',
                   gap: '0.25rem',
@@ -148,23 +162,22 @@ export default function Nav({ onResumeClick }: NavProps) {
                       }}
                       style={{
                         display: 'block',
-                        fontSize: '0.8125rem',
-                        fontWeight: 600,
-                        letterSpacing: '0.04em',
-                        textTransform: 'uppercase',
-                        color: 'var(--color-ink-muted)',
+                        fontSize: '0.85rem',
+                        fontWeight: 500,
+                        letterSpacing: '0.02em',
+                        color: 'var(--color-text-muted)',
                         textDecoration: 'none',
                         padding: '0.75rem 0.9rem',
                         borderRadius: '10px',
                         transition: 'background 0.2s, color 0.2s',
                       }}
                       onMouseEnter={(e) => {
-                        e.currentTarget.style.background = 'rgba(0,0,0,0.04)'
-                        e.currentTarget.style.color = 'var(--color-ink)'
+                        e.currentTarget.style.background = 'rgba(255,255,255,0.05)'
+                        e.currentTarget.style.color = 'var(--color-text)'
                       }}
                       onMouseLeave={(e) => {
                         e.currentTarget.style.background = 'transparent'
-                        e.currentTarget.style.color = 'var(--color-ink-muted)'
+                        e.currentTarget.style.color = 'var(--color-text-muted)'
                       }}
                     >
                       {link.label}
@@ -194,16 +207,17 @@ export default function Nav({ onResumeClick }: NavProps) {
                     handleLinkClick(link.label)
                   }}
                   style={{
-                    fontSize: '0.8125rem',
+                    fontFamily: 'var(--font-mono)',
+                    fontSize: '0.78rem',
                     fontWeight: 500,
-                    letterSpacing: '0.04em',
+                    letterSpacing: '0.06em',
                     textTransform: 'uppercase',
-                    color: 'var(--color-ink-muted)',
+                    color: 'var(--color-text-muted)',
                     textDecoration: 'none',
                     transition: 'color 0.2s',
                   }}
-                  onMouseEnter={(e) => (e.currentTarget.style.color = 'var(--color-ink)')}
-                  onMouseLeave={(e) => (e.currentTarget.style.color = 'var(--color-ink-muted)')}
+                  onMouseEnter={(e) => (e.currentTarget.style.color = 'var(--color-text)')}
+                  onMouseLeave={(e) => (e.currentTarget.style.color = 'var(--color-text-muted)')}
                 >
                   {link.label}
                 </a>

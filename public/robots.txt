@@ -1,0 +1,12 @@
+User-agent: *
+Allow: /$
+Allow: /resume/
+
+# Orphaned demo bundles — keep them out of the index to avoid thin/duplicate content
+Disallow: /demo
+Disallow: /demo-nitro-type
+Disallow: /demo-timing-trainer
+Disallow: /demo-equalization-anywhere
+Disallow: /demo-sites
+
+Sitemap: https://zachbrewer.com/sitemap.xml

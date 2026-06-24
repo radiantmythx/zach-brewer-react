@@ -1,9 +1,11 @@
 import { useEffect, useState } from 'react'
 
+const EMAIL = 'zachary.brewer.professional@gmail.com'
+
 const socialLinks = [
   { label: 'GitHub', href: 'https://github.com/radiantmythx' },
   { label: 'LinkedIn', href: 'https://www.linkedin.com/in/zachary-brewer-88653269/' },
-  { label: 'Email', href: 'mailto:zachary.brewer.professional@gmail.com' },
+  { label: 'Email', href: `mailto:${EMAIL}` },
 ]
 
 export default function Contact() {
@@ -24,28 +26,28 @@ export default function Contact() {
     <section
       id="contact"
       style={{
-        background: 'var(--color-ink)',
-        color: 'var(--color-white)',
-        padding: '8rem 0 4rem',
+        background: 'var(--color-bg)',
+        color: 'var(--color-text)',
+        padding: '9rem 0 4rem',
         overflow: 'hidden',
         position: 'relative',
       }}
     >
-      {/* Large background text */}
+      {/* Large background wordmark */}
       <div
         aria-hidden="true"
         style={{
           position: 'absolute',
-          bottom: '-0.1em',
+          bottom: '-0.08em',
           left: '50%',
           transform: 'translateX(-50%)',
           whiteSpace: 'nowrap',
           fontFamily: 'var(--font-display)',
-          fontWeight: 800,
-          fontSize: 'clamp(6rem, 18vw, 18rem)',
+          fontWeight: 700,
+          fontSize: 'clamp(5rem, 17vw, 17rem)',
           lineHeight: 1,
           letterSpacing: '-0.04em',
-          color: 'rgba(255,255,255,0.03)',
+          color: 'rgba(255,255,255,0.025)',
           pointerEvents: 'none',
           userSelect: 'none',
         }}
@@ -55,7 +57,7 @@ export default function Contact() {
 
       <div
         style={{
-          maxWidth: '1280px',
+          maxWidth: '1240px',
           margin: '0 auto',
           padding: '0 2rem',
           position: 'relative',
@@ -64,67 +66,57 @@ export default function Contact() {
       >
         {/* CTA block */}
         <div style={{ marginBottom: '7rem', textAlign: isMobile ? 'center' : 'left' }}>
-          <p
-            style={{
-              fontSize: '0.75rem',
-              fontWeight: 500,
-              letterSpacing: '0.12em',
-              textTransform: 'uppercase',
-              color: 'rgba(255,255,255,0.4)',
-              marginBottom: '2rem',
-            }}
-          >
+          <p className="eyebrow" style={{ marginBottom: '2rem' }}>
             Get in touch
           </p>
           <h2
             style={{
               fontFamily: 'var(--font-display)',
-              fontWeight: 700,
-              fontStyle: 'italic',
-              fontSize: 'clamp(2.5rem, 7vw, 6rem)',
-              lineHeight: 0.95,
-              letterSpacing: '-0.02em',
-              color: 'var(--color-white)',
+              fontWeight: 600,
+              fontSize: 'clamp(2.5rem, 7vw, 5.5rem)',
+              lineHeight: 0.98,
+              letterSpacing: '-0.03em',
+              color: 'var(--color-text)',
               marginBottom: '2.5rem',
-              maxWidth: '14ch',
+              maxWidth: '15ch',
               marginLeft: isMobile ? 'auto' : 0,
               marginRight: isMobile ? 'auto' : 0,
             }}
           >
-            Let’s ship something great.
+            Let's build something{' '}
+            <span className="accent-gradient">worth shipping.</span>
           </h2>
           <a
-            href="mailto:zachary.brewer.professional@gmail.com"
+            href={`mailto:${EMAIL}`}
             style={{
               display: 'inline-flex',
               alignItems: 'center',
               justifyContent: 'center',
               gap: '0.75rem',
-              fontSize: '0.9375rem',
+              fontSize: '0.95rem',
               fontWeight: 500,
-              color: 'var(--color-white)',
+              color: 'var(--color-text)',
               textDecoration: 'none',
-              border: '1px solid rgba(255,255,255,0.2)',
-              padding: '0.875rem 1.75rem',
+              border: '1px solid var(--color-border-strong)',
+              padding: '0.95rem 1.75rem',
               borderRadius: '99px',
               transition: 'background 0.25s, border-color 0.25s',
               marginLeft: isMobile ? 'auto' : 0,
               marginRight: isMobile ? 'auto' : 0,
               maxWidth: '100%',
-              textAlign: 'center',
             }}
             onMouseEnter={(e) => {
-              e.currentTarget.style.background = 'rgba(255,255,255,0.1)'
-              e.currentTarget.style.borderColor = 'rgba(255,255,255,0.4)'
+              e.currentTarget.style.background = 'rgba(124,107,255,0.12)'
+              e.currentTarget.style.borderColor = 'var(--color-accent)'
             }}
             onMouseLeave={(e) => {
               e.currentTarget.style.background = 'transparent'
-              e.currentTarget.style.borderColor = 'rgba(255,255,255,0.2)'
+              e.currentTarget.style.borderColor = 'var(--color-border-strong)'
             }}
           >
-            zachary.brewer.professional@gmail.com
+            {EMAIL}
             <svg width="14" height="14" viewBox="0 0 14 14" fill="none">
-              <path d="M2 7h10M7 2l5 5-5 5" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round"/>
+              <path d="M2 7h10M7 2l5 5-5 5" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" />
             </svg>
           </a>
         </div>
@@ -132,7 +124,7 @@ export default function Contact() {
         {/* Footer row */}
         <div
           style={{
-            borderTop: '1px solid rgba(255,255,255,0.08)',
+            borderTop: '1px solid var(--color-border)',
             paddingTop: '2.5rem',
             display: 'flex',
             alignItems: 'center',
@@ -142,14 +134,8 @@ export default function Contact() {
             textAlign: isMobile ? 'center' : 'left',
           }}
         >
-          <span
-            style={{
-              fontSize: '0.8125rem',
-              color: 'rgba(255,255,255,0.3)',
-              fontWeight: 400,
-            }}
-          >
-            © {year} Zach Brewer — St. Louis Park, MN
+          <span style={{ fontFamily: 'var(--font-mono)', fontSize: '0.76rem', color: 'var(--color-text-subtle)' }}>
+            © {year} Zach Brewer — Hopkins, MN
           </span>
 
           <ul
@@ -169,14 +155,15 @@ export default function Contact() {
                   target={link.href.startsWith('http') ? '_blank' : undefined}
                   rel={link.href.startsWith('http') ? 'noopener noreferrer' : undefined}
                   style={{
-                    fontSize: '0.8125rem',
-                    fontWeight: 400,
-                    color: 'rgba(255,255,255,0.4)',
+                    fontFamily: 'var(--font-mono)',
+                    fontSize: '0.76rem',
+                    letterSpacing: '0.04em',
+                    color: 'var(--color-text-muted)',
                     textDecoration: 'none',
                     transition: 'color 0.2s',
                   }}
-                  onMouseEnter={(e) => (e.currentTarget.style.color = 'rgba(255,255,255,0.9)')}
-                  onMouseLeave={(e) => (e.currentTarget.style.color = 'rgba(255,255,255,0.4)')}
+                  onMouseEnter={(e) => (e.currentTarget.style.color = 'var(--color-text)')}
+                  onMouseLeave={(e) => (e.currentTarget.style.color = 'var(--color-text-muted)')}
                 >
                   {link.label}
                 </a>

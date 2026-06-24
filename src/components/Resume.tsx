@@ -15,6 +15,18 @@ pdfjsLib.GlobalWorkerOptions.workerSrc = new URL(
 
 const DEFAULT_SCALE = 1.3
 
+const btnStyle: React.CSSProperties = {
+  padding: '0.5rem 0.75rem',
+  backgroundColor: 'var(--color-bg-elev-2)',
+  color: 'var(--color-text)',
+  border: '1px solid var(--color-border)',
+  borderRadius: '8px',
+  fontSize: '0.85rem',
+  fontWeight: 500,
+  cursor: 'pointer',
+  transition: 'background-color 0.2s, border-color 0.2s',
+}
+
 export default function ResumeModal({ isOpen, onClose }: ResumeModalProps) {
   const [numPages, setNumPages] = useState(0)
   const [currentPage, setCurrentPage] = useState(1)
@@ -42,6 +54,16 @@ export default function ResumeModal({ isOpen, onClose }: ResumeModalProps) {
 
     loadPdf()
   }, [isOpen])
+
+  // Close on Escape
+  useEffect(() => {
+    if (!isOpen) return
+    const onKey = (e: KeyboardEvent) => {
+      if (e.key === 'Escape') onClose()
+    }
+    window.addEventListener('keydown', onKey)
+    return () => window.removeEventListener('keydown', onKey)
+  }, [isOpen, onClose])
 
   const renderPage = async (
     pageNum: number,
@@ -72,7 +94,7 @@ export default function ResumeModal({ isOpen, onClose }: ResumeModalProps) {
   }
 
   const handleZoomIn = () => {
-    const newScale = scale + 0.2
+    const newScale = Math.min(3, scale + 0.2)
     setScale(newScale)
     renderPage(currentPage, pdfRef.current, newScale)
   }
@@ -122,10 +144,10 @@ export default function ResumeModal({ isOpen, onClose }: ResumeModalProps) {
 
   const handleMouseMove = (e: React.MouseEvent) => {
     if (!isDragging || !viewerRef.current) return
-    
+
     const deltaX = e.clientX - dragStartRef.current.x
     const deltaY = e.clientY - dragStartRef.current.y
-    
+
     viewerRef.current.scrollLeft = dragStartRef.current.scrollLeft - deltaX
     viewerRef.current.scrollTop = dragStartRef.current.scrollTop - deltaY
   }
@@ -138,10 +160,15 @@ export default function ResumeModal({ isOpen, onClose }: ResumeModalProps) {
 
   return (
     <div
+      role="dialog"
+      aria-modal="true"
+      aria-label="Resume viewer"
       style={{
         position: 'fixed',
         inset: 0,
-        backgroundColor: 'rgba(0, 0, 0, 0.5)',
+        backgroundColor: 'rgba(0, 0, 0, 0.72)',
+        backdropFilter: 'blur(4px)',
+        WebkitBackdropFilter: 'blur(4px)',
         display: 'flex',
         alignItems: 'center',
         justifyContent: 'center',
@@ -152,13 +179,15 @@ export default function ResumeModal({ isOpen, onClose }: ResumeModalProps) {
     >
       <div
         style={{
-          backgroundColor: 'white',
-          borderRadius: '12px',
+          backgroundColor: 'var(--color-bg-elev)',
+          border: '1px solid var(--color-border)',
+          borderRadius: '16px',
           width: 'min(920px, 100%)',
           height: '90vh',
           display: 'flex',
           flexDirection: 'column',
-          boxShadow: '0 20px 25px -5px rgba(0, 0, 0, 0.1)',
+          boxShadow: '0 30px 80px rgba(0, 0, 0, 0.6)',
+          overflow: 'hidden',
         }}
         onClick={(e) => e.stopPropagation()}
       >
@@ -168,8 +197,8 @@ export default function ResumeModal({ isOpen, onClose }: ResumeModalProps) {
             display: 'flex',
             alignItems: 'center',
             justifyContent: 'space-between',
-            padding: '1.5rem',
-            borderBottom: '1px solid #e5e7eb',
+            padding: '1.25rem 1.5rem',
+            borderBottom: '1px solid var(--color-border)',
             flexShrink: 0,
             flexWrap: 'wrap',
             gap: '1rem',
@@ -177,33 +206,17 @@ export default function ResumeModal({ isOpen, onClose }: ResumeModalProps) {
         >
           <h2
             style={{
-              fontSize: '1.25rem',
+              fontFamily: 'var(--font-display)',
+              fontSize: '1.15rem',
               fontWeight: 600,
-              color: 'var(--color-ink)',
+              color: 'var(--color-text)',
               margin: 0,
             }}
           >
             Resume
           </h2>
           <div style={{ display: 'flex', gap: '0.5rem', alignItems: 'center', flexWrap: 'wrap' }}>
-            {/* Zoom Controls */}
-            <button
-              onClick={handleZoomOut}
-              style={{
-                padding: '0.5rem 0.75rem',
-                backgroundColor: '#f3f4f6',
-                color: 'var(--color-ink)',
-                border: 'none',
-                borderRadius: '6px',
-                fontSize: '0.875rem',
-                fontWeight: 500,
-                cursor: 'pointer',
-                transition: 'background-color 0.2s',
-              }}
-              onMouseEnter={(e) => (e.currentTarget.style.backgroundColor = '#e5e7eb')}
-              onMouseLeave={(e) => (e.currentTarget.style.backgroundColor = '#f3f4f6')}
-              title="Zoom out"
-            >
+            <button onClick={handleZoomOut} style={btnStyle} title="Zoom out" aria-label="Zoom out">
               −
             </button>
             <input
@@ -217,104 +230,53 @@ export default function ResumeModal({ isOpen, onClose }: ResumeModalProps) {
                 setScale(newScale)
                 renderPage(currentPage, pdfRef.current, newScale)
               }}
-              style={{
-                width: '120px',
-                height: '6px',
-                borderRadius: '3px',
-                background: '#e5e7eb',
-                outline: 'none',
-                cursor: 'pointer',
-              }}
+              style={{ width: '110px', cursor: 'pointer', accentColor: 'var(--color-accent)' }}
               title="Zoom slider"
+              aria-label="Zoom level"
             />
             <span
               style={{
-                fontSize: '0.875rem',
-                minWidth: '45px',
+                fontFamily: 'var(--font-mono)',
+                fontSize: '0.78rem',
+                minWidth: '44px',
                 textAlign: 'center',
-                color: 'var(--color-ink-muted)',
+                color: 'var(--color-text-muted)',
               }}
             >
               {Math.round(scale * 100)}%
             </span>
-            <button
-              onClick={handleZoomIn}
-              style={{
-                padding: '0.5rem 0.75rem',
-                backgroundColor: '#f3f4f6',
-                color: 'var(--color-ink)',
-                border: 'none',
-                borderRadius: '6px',
-                fontSize: '0.875rem',
-                fontWeight: 500,
-                cursor: 'pointer',
-                transition: 'background-color 0.2s',
-              }}
-              onMouseEnter={(e) => (e.currentTarget.style.backgroundColor = '#e5e7eb')}
-              onMouseLeave={(e) => (e.currentTarget.style.backgroundColor = '#f3f4f6')}
-              title="Zoom in"
-            >
+            <button onClick={handleZoomIn} style={btnStyle} title="Zoom in" aria-label="Zoom in">
               +
             </button>
             <button
               onClick={handleResetView}
-              style={{
-                padding: '0.5rem 0.75rem',
-                backgroundColor: '#f3f4f6',
-                color: 'var(--color-ink)',
-                border: 'none',
-                borderRadius: '6px',
-                fontSize: '0.75rem',
-                fontWeight: 600,
-                letterSpacing: '0.03em',
-                textTransform: 'uppercase',
-                cursor: 'pointer',
-                transition: 'background-color 0.2s',
-              }}
-              onMouseEnter={(e) => (e.currentTarget.style.backgroundColor = '#e5e7eb')}
-              onMouseLeave={(e) => (e.currentTarget.style.backgroundColor = '#f3f4f6')}
+              style={{ ...btnStyle, fontSize: '0.72rem', fontWeight: 600, letterSpacing: '0.04em', textTransform: 'uppercase' }}
               title="Reset view"
             >
               Reset
             </button>
 
-            <div style={{ width: '1px', height: '24px', backgroundColor: '#e5e7eb' }} />
+            <div style={{ width: '1px', height: '24px', backgroundColor: 'var(--color-border)' }} />
 
             <a
               href="/resume/resume.pdf"
-              download="resume.pdf"
+              download="Zach-Brewer-Resume.pdf"
               style={{
                 padding: '0.5rem 1rem',
-                backgroundColor: 'var(--color-ink)',
-                color: 'white',
-                borderRadius: '6px',
+                background: 'linear-gradient(120deg, var(--color-accent), var(--color-accent-bright))',
+                color: '#fff',
+                borderRadius: '8px',
                 textDecoration: 'none',
-                fontSize: '0.875rem',
-                fontWeight: 500,
-                cursor: 'pointer',
+                fontSize: '0.85rem',
+                fontWeight: 600,
                 transition: 'opacity 0.2s',
               }}
-              onMouseEnter={(e) => (e.currentTarget.style.opacity = '0.8')}
+              onMouseEnter={(e) => (e.currentTarget.style.opacity = '0.85')}
               onMouseLeave={(e) => (e.currentTarget.style.opacity = '1')}
             >
               Download
             </a>
-            <button
-              onClick={onClose}
-              style={{
-                padding: '0.5rem 1rem',
-                backgroundColor: '#f3f4f6',
-                color: 'var(--color-ink)',
-                border: 'none',
-                borderRadius: '6px',
-                fontSize: '0.875rem',
-                fontWeight: 500,
-                cursor: 'pointer',
-                transition: 'background-color 0.2s',
-              }}
-              onMouseEnter={(e) => (e.currentTarget.style.backgroundColor = '#e5e7eb')}
-              onMouseLeave={(e) => (e.currentTarget.style.backgroundColor = '#f3f4f6')}
-            >
+            <button onClick={onClose} style={btnStyle} aria-label="Close resume viewer">
               Close
             </button>
           </div>
@@ -331,7 +293,7 @@ export default function ResumeModal({ isOpen, onClose }: ResumeModalProps) {
             flex: 1,
             minHeight: 0,
             overflow: 'auto',
-            backgroundColor: '#f5f5f5',
+            backgroundColor: 'var(--color-bg)',
             padding: '1rem',
             cursor: isDragging ? 'grabbing' : 'grab',
             userSelect: 'none',
@@ -351,7 +313,8 @@ export default function ResumeModal({ isOpen, onClose }: ResumeModalProps) {
               ref={canvasRef}
               style={{
                 backgroundColor: 'white',
-                boxShadow: '0 1px 3px rgba(0, 0, 0, 0.1)',
+                boxShadow: '0 4px 24px rgba(0, 0, 0, 0.4)',
+                borderRadius: '4px',
                 display: 'block',
                 flexShrink: 0,
               }}
@@ -366,63 +329,26 @@ export default function ResumeModal({ isOpen, onClose }: ResumeModalProps) {
               display: 'flex',
               alignItems: 'center',
               justifyContent: 'space-between',
-              padding: '1rem',
-              borderTop: '1px solid #e5e7eb',
-              backgroundColor: '#f9fafb',
+              padding: '0.9rem 1.25rem',
+              borderTop: '1px solid var(--color-border)',
+              backgroundColor: 'var(--color-bg-elev-2)',
               flexShrink: 0,
             }}
           >
             <button
               onClick={handlePrevPage}
               disabled={currentPage === 1}
-              style={{
-                padding: '0.5rem 1rem',
-                backgroundColor: currentPage === 1 ? '#e5e7eb' : '#f3f4f6',
-                color: 'var(--color-ink)',
-                border: 'none',
-                borderRadius: '6px',
-                fontSize: '0.875rem',
-                fontWeight: 500,
-                cursor: currentPage === 1 ? 'not-allowed' : 'pointer',
-                transition: 'background-color 0.2s',
-              }}
-              onMouseEnter={(e) => {
-                if (currentPage > 1) e.currentTarget.style.backgroundColor = '#e5e7eb'
-              }}
-              onMouseLeave={(e) => {
-                if (currentPage > 1) e.currentTarget.style.backgroundColor = '#f3f4f6'
-              }}
+              style={{ ...btnStyle, opacity: currentPage === 1 ? 0.4 : 1, cursor: currentPage === 1 ? 'not-allowed' : 'pointer' }}
             >
               Previous
             </button>
-            <span
-              style={{
-                fontSize: '0.875rem',
-                color: 'var(--color-ink-muted)',
-              }}
-            >
+            <span style={{ fontFamily: 'var(--font-mono)', fontSize: '0.8rem', color: 'var(--color-text-muted)' }}>
               Page {currentPage} of {numPages}
             </span>
             <button
               onClick={handleNextPage}
               disabled={currentPage === numPages}
-              style={{
-                padding: '0.5rem 1rem',
-                backgroundColor: currentPage === numPages ? '#e5e7eb' : '#f3f4f6',
-                color: 'var(--color-ink)',
-                border: 'none',
-                borderRadius: '6px',
-                fontSize: '0.875rem',
-                fontWeight: 500,
-                cursor: currentPage === numPages ? 'not-allowed' : 'pointer',
-                transition: 'background-color 0.2s',
-              }}
-              onMouseEnter={(e) => {
-                if (currentPage < numPages) e.currentTarget.style.backgroundColor = '#e5e7eb'
-              }}
-              onMouseLeave={(e) => {
-                if (currentPage < numPages) e.currentTarget.style.backgroundColor = '#f3f4f6'
-              }}
+              style={{ ...btnStyle, opacity: currentPage === numPages ? 0.4 : 1, cursor: currentPage === numPages ? 'not-allowed' : 'pointer' }}
             >
               Next
             </button>

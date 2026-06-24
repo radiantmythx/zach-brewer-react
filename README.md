@@ -1,63 +1,65 @@
-# Zach Brewer Personal Site
+# Zach Brewer — Personal Site
 
-A modern personal portfolio built with React, TypeScript, and Vite.
+A modern, dark, tech-forward personal site built with React, TypeScript, and Vite.
 
-This site is designed to feel clean, fast, and human. It showcases projects, work experience, and contact information, and includes an in-site Resume viewer modal with zoom, drag-to-pan, page controls, and one-click download.
-
-## Highlights
-
-- Built with React + TypeScript + Vite for a snappy experience
-- Custom navigation and section-based portfolio layout
-- Interactive Resume modal (no external page routing)
-- PDF controls: zoom buttons, zoom slider, reset view, page navigation, drag-to-pan
-- Mobile-friendly behavior so the Resume stays readable on smaller screens
+The site is a single page — Hero, Experience, About, Contact — with an in-site
+Resume viewer (zoom, drag-to-pan, page controls, download). It is **pre-rendered
+to static HTML at build time** so crawlers and social scrapers receive a fully
+populated page, then hydrated in the browser.
 
 ## Tech Stack
 
-- React
-- TypeScript
-- Vite
-- pdfjs-dist
+- React 19 + TypeScript
+- Vite 8
+- Tailwind v4 (design tokens) + inline component styles
+- pdfjs-dist (lazy-loaded resume viewer)
 
-## Getting Started
+## Design
 
-1. Install dependencies
+- Dark surfaces, glowing accent (`#7c6bff` → `#22d3ee`), animated canvas hero
+- Type: Space Grotesk (display), Inter (body), JetBrains Mono (labels)
+- Tokens live in `src/index.css` under `@theme`
 
-   npm install
+## Pre-rendering (SEO)
 
-2. Run development server
+`npm run build` runs three steps:
 
-   npm run dev
+1. `vite build` — client bundle + `dist/index.html` template (contains `<!--app-html-->`)
+2. `vite build --ssr src/entry-server.tsx` — a server bundle in `dist/server`
+3. `node scripts/prerender.mjs` — renders the app to HTML, injects it into
+   `dist/index.html`, and removes the temporary server bundle
 
-3. Build for production
+Entry points:
+- `src/entry-client.tsx` — hydrates the pre-rendered markup
+- `src/entry-server.tsx` — `render()` used only at build time
 
-   npm run build
+The resume modal (and pdfjs) is `lazy()`-loaded and rendered only when opened, so
+it never enters the server bundle and ships as a separate client chunk.
 
-## Resume File Location
+SEO assets: `index.html` carries full meta + Open Graph + Twitter + JSON-LD
+`Person` schema; `public/robots.txt`, `public/sitemap.xml`, and `public/og-image.svg`.
 
-The live Resume used by the modal is served from:
+## Security
 
-public/resume/resume.pdf
+Security headers (CSP, HSTS, `X-Content-Type-Options`, `Referrer-Policy`,
+`X-Frame-Options`, `Permissions-Policy`) are configured for both hosts:
+- `netlify.toml` → `[[headers]]`
+- `vercel.json` → `headers`
 
-If you want to replace the Resume, swap that file with your updated PDF and restart the dev server if needed.
+## Scripts
 
-## Available Scripts
+- `npm run dev` — local dev server
+- `npm run build` — type-check, build, and pre-render to static HTML
+- `npm run preview` — preview the production build
+- `npm run lint` — eslint
 
-- npm run dev: start local development server
-- npm run build: type-check and create production build
-- npm run build:all: build demo assets and this site build
+## Resume
+
+The live resume is served from `public/resume/resume.pdf`. Swap that file to update it.
 
 ## Notes
 
-This project tracks generated demo assets in `public/` for deployment convenience:
-
-- `public/demo` (Survivor React Engine)
-- `public/demo-equalization-anywhere` (EQ Anywhere site demo)
-- `public/demo-nitro-type` (Nitro Type Trainer)
-- `public/demo-timing-trainer` (Timing Trainer)
-
-Run `npm run build:demo` to rebuild these demo bundles, or `npm run build:all` to rebuild demos and then this site.
-
----
-
-Built with care to be pleasant to explore, easy to maintain, and fun to keep improving.
+`public/demo-*` and `public/demo-sites/` contain older standalone demo bundles. They
+are no longer linked from the site and are disallowed in `robots.txt`. They can be
+deleted if you don't need them — but check first whether any external listing (e.g.
+the Equalization Anywhere Chrome Web Store privacy-policy URL) still points at them.
