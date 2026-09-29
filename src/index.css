@@ -1,4 +1,4 @@
-@import url('https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@400;500;600;700&family=Inter:wght@300;400;500;600&family=JetBrains+Mono:wght@400;500&display=swap');
+@import url('https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@400;500;600;700&family=Inter:wght@300;400;500;600&family=JetBrains+Mono:wght@400;500;700&display=swap');
 
 @import "tailwindcss";
 
@@ -22,13 +22,33 @@
   --color-border: rgba(255, 255, 255, 0.08);
   --color-border-strong: rgba(255, 255, 255, 0.16);
 
-  /* Accent */
-  --color-accent: #7c6bff;
-  --color-accent-bright: #9d8cff;
-  --color-accent-cyan: #22d3ee;
+  /* Era palette — the site migrates through these as you scroll */
+  --color-phosphor: #46f78f;
+  --color-phosphor-dim: #2a9457;
+  --color-amber: #ffb454;
+  --color-sakura: #ff8fb8;
+  --color-sakura-bright: #ffb3cf;
+  --color-sakura-deep: #e2578f;
+
+  /* Accent (sakura era — also themes the resume modal) */
+  --color-accent: #e2578f;
+  --color-accent-bright: #ff8fb8;
+  --color-accent-cyan: #ffd9e6;
 
   --ease-expo: cubic-bezier(0.16, 1, 0.3, 1);
   --ease-out: cubic-bezier(0.0, 0, 0.2, 1);
+}
+
+/*
+ * Era-driven variables. JS interpolates these on scroll
+ * (see src/era.ts). Defaults = top of page = mainframe era.
+ */
+:root {
+  --era-accent: #46f78f;
+  --era-accent-soft: rgba(70, 247, 143, 0.14);
+  --era-bg: #020604;
+  --era-glow-a: rgba(70, 247, 143, 0.07);
+  --era-glow-b: rgba(70, 247, 143, 0.04);
 }
 
 *,
@@ -49,14 +69,14 @@ html {
 
 body {
   font-family: var(--font-sans);
-  background-color: var(--color-bg);
+  background-color: var(--era-bg);
   color: var(--color-text);
   overflow-x: hidden;
   line-height: 1.6;
 }
 
 ::selection {
-  background-color: var(--color-accent);
+  background-color: var(--color-sakura-deep);
   color: #ffffff;
 }
 
@@ -64,9 +84,31 @@ a {
   color: inherit;
 }
 
-/* Gradient accent text */
+/* Screen-reader only */
+.sr-only {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  padding: 0;
+  margin: -1px;
+  overflow: hidden;
+  clip: rect(0, 0, 0, 0);
+  white-space: nowrap;
+  border: 0;
+}
+
+/* Gradient accent text — sakura bloom */
 .accent-gradient {
-  background: linear-gradient(120deg, var(--color-accent-bright) 0%, var(--color-accent-cyan) 100%);
+  background: linear-gradient(120deg, var(--color-sakura-bright) 0%, var(--color-sakura-deep) 55%, #c9a0ff 100%);
+  -webkit-background-clip: text;
+  background-clip: text;
+  -webkit-text-fill-color: transparent;
+  color: transparent;
+}
+
+/* Phosphor-green gradient text — mainframe era */
+.phosphor-gradient {
+  background: linear-gradient(120deg, #9dffc8 0%, var(--color-phosphor) 60%, #2a9457 100%);
   -webkit-background-clip: text;
   background-clip: text;
   -webkit-text-fill-color: transparent;
@@ -83,9 +125,138 @@ a {
   color: var(--color-text-subtle);
 }
 
+/* CRT scanlines — overlaid on the terminal hero */
+.crt::after {
+  content: '';
+  position: absolute;
+  inset: 0;
+  pointer-events: none;
+  background: repeating-linear-gradient(
+    to bottom,
+    rgba(0, 0, 0, 0) 0px,
+    rgba(0, 0, 0, 0) 2px,
+    rgba(0, 0, 0, 0.18) 3px,
+    rgba(0, 0, 0, 0) 4px
+  );
+  mix-blend-mode: multiply;
+}
+
+/* Slow phosphor flicker */
+@keyframes crt-flicker {
+  0%   { opacity: 1; }
+  3%   { opacity: 0.96; }
+  6%   { opacity: 1; }
+  54%  { opacity: 1; }
+  55%  { opacity: 0.97; }
+  56%  { opacity: 1; }
+  100% { opacity: 1; }
+}
+.crt-flicker {
+  animation: crt-flicker 6s linear infinite;
+}
+
+/* Blinking terminal cursor */
+@keyframes blink {
+  0%, 49% { opacity: 1; }
+  50%, 100% { opacity: 0; }
+}
+.cursor-blink {
+  animation: blink 1.05s step-end infinite;
+}
+
+/* Soft float for decorative blossoms */
+@keyframes bloom-drift {
+  0%   { transform: translateY(0) rotate(0deg); }
+  50%  { transform: translateY(-8px) rotate(2deg); }
+  100% { transform: translateY(0) rotate(0deg); }
+}
+
+/* CRT power-on: the screen snaps from a bright horizontal line to full frame */
+@keyframes crt-power-on {
+  0%   { transform: scaleY(0.005) scaleX(0.7); filter: brightness(6) saturate(0.4); }
+  40%  { transform: scaleY(0.005) scaleX(1); filter: brightness(6) saturate(0.5); }
+  70%  { transform: scaleY(1) scaleX(1); filter: brightness(1.8); }
+  100% { transform: none; filter: none; }
+}
+.crt-power-on {
+  animation: crt-power-on 0.9s cubic-bezier(0.16, 1, 0.3, 1) both;
+}
+
+/* Era-boundary glitch: fires for ~0.3s when scroll crosses into a new era */
+@keyframes era-glitch {
+  0%   { transform: translate(0); filter: none; }
+  20%  { transform: translate(-7px, 2px) skewX(-1.5deg); filter: hue-rotate(24deg) saturate(1.8); }
+  40%  { transform: translate(6px, -2px) skewX(1deg); filter: hue-rotate(-18deg) saturate(1.4); }
+  60%  { transform: translate(-3px, 1px); filter: saturate(2.2); }
+  80%  { transform: translate(2px, -1px); filter: hue-rotate(10deg); }
+  100% { transform: none; filter: none; }
+}
+.era-glitch main {
+  animation: era-glitch 0.28s steps(1) both;
+}
+
+/* Era crossing #2: a luminous scan band sweeps down the viewport */
+@keyframes scan-sweep {
+  from { transform: translateY(-100%); }
+  to   { transform: translateY(100%); }
+}
+.sweep-overlay {
+  position: fixed;
+  inset: 0;
+  z-index: 60;
+  pointer-events: none;
+  background: linear-gradient(
+    to bottom,
+    transparent 30%,
+    rgba(255, 180, 84, 0.14) 47%,
+    rgba(255, 143, 184, 0.18) 53%,
+    transparent 70%
+  );
+  animation: scan-sweep 0.9s var(--ease-out) both;
+}
+
+/* Era crossing #3: a soft pink pulse blooms out from the center */
+@keyframes bloom-pulse {
+  0%   { opacity: 0; transform: scale(0.55); }
+  25%  { opacity: 1; }
+  100% { opacity: 0; transform: scale(1.65); }
+}
+.bloom-pulse-overlay {
+  position: fixed;
+  inset: 0;
+  z-index: 60;
+  pointer-events: none;
+  background: radial-gradient(
+    50% 50% at 50% 50%,
+    rgba(255, 143, 184, 0.22) 0%,
+    rgba(226, 87, 143, 0.08) 45%,
+    transparent 70%
+  );
+  animation: bloom-pulse 1.1s var(--ease-out) both;
+}
+
+/* Cursor spotlight on tilting cards */
+.tilt-card:hover .tilt-glow {
+  opacity: 1;
+}
+
+/* Blossoms popping open when the contact branch scrolls into view */
+@keyframes bloom-pop {
+  0%   { transform: scale(0); opacity: 0; }
+  70%  { transform: scale(1.22); opacity: 1; }
+  100% { transform: scale(1); opacity: 1; }
+}
+.bloom-pop {
+  transform-box: fill-box;
+  transform-origin: center;
+}
+.bloom-ready .bloom-pop {
+  animation: bloom-pop 0.7s var(--ease-expo) both;
+}
+
 /* Focus visibility for keyboard users */
 :focus-visible {
-  outline: 2px solid var(--color-accent-bright);
+  outline: 2px solid var(--era-accent);
   outline-offset: 3px;
   border-radius: 2px;
 }

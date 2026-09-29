@@ -1,8 +1,82 @@
-const skills = [
-  'C# / .NET', 'React', 'TypeScript', 'GraphQL',
-  'Java', 'Python', 'SQL Server', 'Node.js',
-  'Azure', 'Azure DevOps', 'Jenkins', 'Selenium',
-  'Datadog', 'Splunk', 'GitHub Copilot', 'Godot',
+import DecodeText from './DecodeText'
+import Reveal from './Reveal'
+
+/*
+ * By this point in the scroll the migration is nearly complete — the section
+ * is fully modern, but the toolkit keeps its terminal DNA: skills presented
+ * as an installed-package manifest.
+ */
+
+/* Giant background blossom: half wireframe (digital), half filled (nature) */
+function BlossomWatermark() {
+  const petals = [0, 72, 144, 216, 288]
+  return (
+    <svg
+      viewBox="0 0 200 200"
+      aria-hidden="true"
+      style={{
+        position: 'absolute',
+        top: '2rem',
+        right: 'clamp(-6rem, -4vw, -2rem)',
+        width: 'min(30rem, 55vw)',
+        height: 'auto',
+        pointerEvents: 'none',
+        userSelect: 'none',
+        animation: 'bloom-drift 12s ease-in-out infinite',
+      }}
+    >
+      <defs>
+        <radialGradient id="wmPetal" cx="50%" cy="30%" r="80%">
+          <stop offset="0%" stopColor="rgba(255, 211, 227, 0.09)" />
+          <stop offset="100%" stopColor="rgba(226, 87, 143, 0.05)" />
+        </radialGradient>
+      </defs>
+      {petals.map((deg, i) =>
+        i < 2 ? (
+          // Digital half: wireframe petals with dashed strokes
+          <ellipse
+            key={deg}
+            cx="100"
+            cy="52"
+            rx="30"
+            ry="46"
+            fill="none"
+            stroke="rgba(255, 143, 184, 0.12)"
+            strokeWidth="1"
+            strokeDasharray="5 4"
+            transform={`rotate(${deg} 100 100)`}
+          />
+        ) : (
+          // Nature half: soft filled petals
+          <ellipse
+            key={deg}
+            cx="100"
+            cy="52"
+            rx="30"
+            ry="46"
+            fill="url(#wmPetal)"
+            transform={`rotate(${deg} 100 100)`}
+          />
+        ),
+      )}
+      <circle cx="100" cy="100" r="7" fill="rgba(255, 233, 168, 0.1)" />
+    </svg>
+  )
+}
+
+const PACKAGES: { name: string; note: string }[] = [
+  { name: 'csharp-dotnet', note: 'daily driver' },
+  { name: 'react', note: 'daily driver' },
+  { name: 'typescript', note: 'daily driver' },
+  { name: 'graphql', note: 'production' },
+  { name: 'azure + devops', note: 'production' },
+  { name: 'sql-server', note: 'production' },
+  { name: 'node', note: 'production' },
+  { name: 'jenkins / selenium', note: 'production' },
+  { name: 'datadog / splunk', note: 'production' },
+  { name: 'java / python', note: 'as needed' },
+  { name: 'github-copilot', note: 'org evangelist' },
+  { name: 'godot', note: 'nights & weekends' },
 ]
 
 const facts = [
@@ -17,28 +91,31 @@ export default function About() {
     <section
       id="about"
       style={{
-        background: 'var(--color-bg-elev)',
-        padding: '9rem 0',
+        padding: '8rem 0',
+        position: 'relative',
         borderTop: '1px solid var(--color-border)',
-        borderBottom: '1px solid var(--color-border)',
+        overflow: 'hidden',
       }}
     >
+      <BlossomWatermark />
+
       <div
         className="two-col"
         style={{
           maxWidth: '1240px',
           margin: '0 auto',
-          padding: '0 2rem',
+          padding: '0 1.5rem',
           display: 'grid',
-          gridTemplateColumns: '1.1fr 0.9fr',
+          gridTemplateColumns: '1.05fr 0.95fr',
           gap: '5rem',
           alignItems: 'start',
+          position: 'relative',
         }}
       >
         {/* Left: text */}
-        <div>
-          <p className="eyebrow" style={{ marginBottom: '1.75rem' }}>
-            About
+        <Reveal>
+          <p className="eyebrow" style={{ color: 'var(--era-accent)', marginBottom: '1.75rem' }}>
+            ❀ About
           </p>
           <h2
             style={{
@@ -51,9 +128,9 @@ export default function About() {
               marginBottom: '2rem',
             }}
           >
-            Craft-obsessed,
+            <DecodeText text="Craft-obsessed," />
             <br />
-            <span className="accent-gradient">end to end.</span>
+            <DecodeText text="end to end." className="accent-gradient" />
           </h2>
           <p
             style={{
@@ -84,31 +161,66 @@ export default function About() {
             infrastructure, modern React, and the new frontier of AI-assisted
             development. If it's interesting, I'm all in.
           </p>
-        </div>
+        </Reveal>
 
-        {/* Right: skills + facts */}
-        <div>
-          <p className="eyebrow" style={{ marginBottom: '1.25rem' }}>
-            Toolkit
-          </p>
-          <div style={{ display: 'flex', flexWrap: 'wrap', gap: '0.5rem', marginBottom: '3rem' }}>
-            {skills.map((skill) => (
-              <span
-                key={skill}
-                style={{
-                  fontFamily: 'var(--font-mono)',
-                  fontSize: '0.74rem',
-                  letterSpacing: '0.02em',
-                  color: 'var(--color-text)',
-                  border: '1px solid var(--color-border)',
-                  padding: '0.35rem 0.75rem',
-                  borderRadius: '7px',
-                  background: 'var(--color-bg-elev-2)',
-                }}
-              >
-                {skill}
+        {/* Right: package manifest + facts */}
+        <Reveal delay={0.12}>
+          <div
+            style={{
+              border: '1px solid rgba(255,143,184,0.22)',
+              borderRadius: '14px',
+              background: 'rgba(20, 12, 22, 0.55)',
+              backdropFilter: 'blur(10px)',
+              WebkitBackdropFilter: 'blur(10px)',
+              overflow: 'hidden',
+              marginBottom: '3rem',
+              boxShadow: '0 0 40px rgba(226,87,143,0.07)',
+            }}
+          >
+            <div
+              style={{
+                display: 'flex',
+                alignItems: 'center',
+                gap: '0.5rem',
+                padding: '0.6rem 1rem',
+                borderBottom: '1px solid rgba(255,143,184,0.15)',
+                fontFamily: 'var(--font-mono)',
+                fontSize: '0.66rem',
+                letterSpacing: '0.1em',
+                color: 'var(--color-sakura)',
+              }}
+            >
+              <span aria-hidden="true" style={{ display: 'flex', gap: '0.3rem' }}>
+                <i style={{ width: 8, height: 8, borderRadius: '50%', background: 'rgba(255,143,184,0.5)' }} />
+                <i style={{ width: 8, height: 8, borderRadius: '50%', background: 'rgba(255,143,184,0.28)' }} />
+                <i style={{ width: 8, height: 8, borderRadius: '50%', background: 'rgba(255,143,184,0.14)' }} />
               </span>
-            ))}
+              zb — toolkit manifest
+            </div>
+            <div
+              style={{
+                padding: '1rem 1.15rem 1.15rem',
+                fontFamily: 'var(--font-mono)',
+                fontSize: '0.74rem',
+                lineHeight: 2,
+              }}
+            >
+              <div style={{ color: 'var(--color-text-subtle)' }}>$ zb list --installed</div>
+              {PACKAGES.map((pkg, i) => (
+                <div key={pkg.name} style={{ display: 'flex', justifyContent: 'space-between', gap: '1rem' }}>
+                  <span style={{ color: 'var(--color-text)', whiteSpace: 'nowrap' }}>
+                    <span style={{ color: 'var(--color-sakura)' }}>
+                      {i === PACKAGES.length - 1 ? '└─' : '├─'}
+                    </span>{' '}
+                    {pkg.name}
+                  </span>
+                  <span style={{ color: 'var(--color-text-subtle)', textAlign: 'right' }}>[{pkg.note}]</span>
+                </div>
+              ))}
+              <div style={{ color: 'var(--color-sakura)', marginTop: '0.35rem' }}>
+                ✓ 12 packages, 0 vulnerabilities, 1 craftsman
+              </div>
+            </div>
           </div>
 
           <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '2rem 2.5rem' }}>
@@ -123,7 +235,7 @@ export default function About() {
               </div>
             ))}
           </div>
-        </div>
+        </Reveal>
       </div>
     </section>
   )

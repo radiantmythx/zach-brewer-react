@@ -1,134 +1,224 @@
-import { useEffect, useRef } from 'react'
+import { useEffect, useLayoutEffect, useRef, useState } from 'react'
+import { triggerPetalStorm } from '../era'
 
-export default function Hero() {
-  const canvasRef = useRef<HTMLCanvasElement>(null)
+interface HeroProps {
+  onOpenResume?: () => void
+}
+
+/* ---- bitmap font for the ASCII wordmark (guaranteed-correct letterforms) ---- */
+
+const FONT: Record<string, string[]> = {
+  Z: ['█████', '   █ ', '  █  ', ' █   ', '█████'],
+  A: [' ███ ', '█   █', '█████', '█   █', '█   █'],
+  C: [' ████', '█    ', '█    ', '█    ', ' ████'],
+  H: ['█   █', '█   █', '█████', '█   █', '█   █'],
+  B: ['████ ', '█   █', '████ ', '█   █', '████ '],
+  R: ['████ ', '█   █', '████ ', '█  █ ', '█   █'],
+  E: ['█████', '█    ', '████ ', '█    ', '█████'],
+  W: ['█   █', '█   █', '█ █ █', '█ █ █', ' █ █ '],
+}
+
+function ascii(word: string): string {
+  const rows: string[] = []
+  for (let r = 0; r < 5; r++) {
+    rows.push(
+      word
+        .split('')
+        .map((ch) => FONT[ch]?.[r] ?? '     ')
+        .join(' '),
+    )
+  }
+  return rows.join('\n')
+}
+
+const ASCII_ZACH = ascii('ZACH')
+const ASCII_BREWER = ascii('BREWER')
+
+/* ---- boot sequence ---- */
+
+const BOOT_LINES = [
+  'ZB/370 SYSTEM CONSOLE — INITIAL PROGRAM LOAD',
+  'MEM CHECK .................. 640K OK (plenty)',
+  'MOUNTING /dev/craft ........ OK',
+  'MOUNTING /dev/sakura ....... OK',
+  'PETAL SUBSYSTEM ............ ONLINE',
+  'LOADING ENTERPRISE.FINANCE . OK',
+  'LOADING FULLSTACK.WEB ...... OK',
+  'LOADING GAME.DEV ........... OK',
+  'LOADING MODERN.AI .......... OK',
+  'BOOT COMPLETE — WELCOME, VISITOR',
+]
+
+// Distinguishes "booted during an earlier page load" from "the boot effect
+// already ran once during THIS load" — StrictMode double-invokes the effect,
+// and the sessionStorage flag alone would make the second run skip the
+// animation and leave the terminal stuck in its rewound (blank) state.
+let animatedThisLoad = false
+
+const HELP_TEXT = [
+  'available commands:',
+  '  whoami      who is this guy',
+  '  ls          look around',
+  '  resume      open the resume',
+  '  contact     get in touch',
+  '  migrate     begin the mainframe → cloud migration',
+  '  sakura      🌸',
+  '  clear       clear terminal',
+]
+
+export default function Hero({ onOpenResume }: HeroProps) {
+  // How much of the boot sequence is visible. Server renders everything so
+  // the prerendered HTML is complete; the client re-runs the animation once
+  // per session.
+  const [bootShown, setBootShown] = useState(BOOT_LINES.length)
+  const [nameShown, setNameShown] = useState(true)
+  const [history, setHistory] = useState<string[]>([])
+  const [input, setInput] = useState('')
+  const [powerOn, setPowerOn] = useState(false)
+  const inputRef = useRef<HTMLInputElement>(null)
+  const historyRef = useRef<HTMLDivElement>(null)
+
+  useLayoutEffect(() => {
+    const reduceMotion = window.matchMedia('(prefers-reduced-motion: reduce)').matches
+    if (reduceMotion) return
+    if (sessionStorage.getItem('zb-booted') && !animatedThisLoad) return
+
+    animatedThisLoad = true
+    sessionStorage.setItem('zb-booted', '1')
+    // Synchronous rewind before first paint is intentional: the server renders
+    // the fully-booted state for SEO, and this resets it so the boot sequence
+    // can animate once per session without a flash of final content.
+    // eslint-disable-next-line react-hooks/set-state-in-effect
+    setBootShown(0)
+    setNameShown(false)
+    setPowerOn(true)
+
+    const timers: number[] = []
+    BOOT_LINES.forEach((_, i) => {
+      timers.push(window.setTimeout(() => setBootShown(i + 1), 160 + i * 130))
+    })
+    timers.push(
+      window.setTimeout(() => setNameShown(true), 160 + BOOT_LINES.length * 130 + 180),
+    )
+    return () => timers.forEach(clearTimeout)
+  }, [])
 
   useEffect(() => {
-    const canvas = canvasRef.current
-    if (!canvas) return
-    const ctx = canvas.getContext('2d')
-    if (!ctx) return
+    historyRef.current?.scrollTo({ top: historyRef.current.scrollHeight })
+  }, [history])
 
-    const reduceMotion = window.matchMedia('(prefers-reduced-motion: reduce)').matches
-    let raf: number
+  const run = (raw: string) => {
+    const cmd = raw.trim().toLowerCase()
+    const echo = `visitor@zb-s370:~$ ${raw}`
+    const out: string[] = []
 
-    const resize = () => {
-      const dpr = Math.min(window.devicePixelRatio || 1, 2)
-      canvas.width = canvas.offsetWidth * dpr
-      canvas.height = canvas.offsetHeight * dpr
-      ctx.setTransform(dpr, 0, 0, dpr, 0, 0)
+    switch (cmd) {
+      case '':
+        break
+      case 'help':
+      case '?':
+        out.push(...HELP_TEXT)
+        break
+      case 'whoami':
+        out.push(
+          'Zach Brewer — Software Engineer & AVP @ U.S. Bank.',
+          '10+ years, mainframe to cloud. Obsessed with the craft.',
+        )
+        break
+      case 'ls':
+      case 'ls -la':
+      case 'dir':
+        out.push('experience/   about/   contact/   resume.pdf   sakura/')
+        break
+      case 'cat resume.pdf':
+        out.push("resume.pdf is a binary file. try 'resume' instead.")
+        break
+      case 'resume':
+      case 'open resume':
+        out.push('opening resume…')
+        onOpenResume?.()
+        break
+      case 'contact':
+      case 'cd contact':
+        out.push('routing to contact…')
+        document.getElementById('contact')?.scrollIntoView({ behavior: 'smooth' })
+        break
+      case 'migrate':
+      case 'cd cloud':
+      case 'cd experience':
+        out.push('beginning migration — hold on to your datasets…')
+        document.getElementById('experience')?.scrollIntoView({ behavior: 'smooth' })
+        break
+      case 'sakura':
+      case 'bloom':
+        out.push('🌸 full bloom protocol engaged')
+        triggerPetalStorm()
+        break
+      case 'clear':
+      case 'cls':
+        setHistory([])
+        setInput('')
+        return
+      case 'neofetch':
+        out.push(
+          '        *  zach@brewer',
+          '       ❀   ─────────────',
+          '      🌸    OS: Enterprise Finance → Cloud',
+          '            Shell: C# / React / GraphQL',
+          '            Uptime: 10+ years',
+          '            Side quests: Godot, AI tooling',
+        )
+        break
+      case 'sudo':
+      case 'sudo su':
+      case 'sudo rm -rf /':
+      case 'su':
+        out.push('visitor is not in the sudoers file. this incident will be reported. 🌸')
+        break
+      case 'exit':
+      case 'quit':
+        out.push("there is no escape. scroll down instead.")
+        break
+      case 'vim':
+      case 'emacs':
+        out.push('war is not the answer. peace. 🌸')
+        break
+      default:
+        out.push(`command not found: ${cmd} — try 'help'`)
     }
 
-    // Glowing accent orbs over the dark background
-    const orbs = [
-      { x: 0.78, y: 0.28, r: 0.42, color: 'rgba(124, 107, 255, 0.22)' },
-      { x: 0.18, y: 0.72, r: 0.34, color: 'rgba(34, 211, 238, 0.10)' },
-      { x: 0.52, y: 0.9, r: 0.28, color: 'rgba(124, 107, 255, 0.10)' },
-    ]
+    setHistory((h) => [...h.slice(-40), echo, ...out])
+    setInput('')
+  }
 
-    let tick = 0
-
-    const draw = () => {
-      const cw = canvas.offsetWidth
-      const ch = canvas.offsetHeight
-
-      ctx.clearRect(0, 0, cw, ch)
-
-      // Fine grid
-      ctx.save()
-      ctx.strokeStyle = 'rgba(255,255,255,0.035)'
-      ctx.lineWidth = 0.5
-      const gridSize = 56
-      for (let x = 0; x < cw; x += gridSize) {
-        ctx.beginPath()
-        ctx.moveTo(x, 0)
-        ctx.lineTo(x, ch)
-        ctx.stroke()
-      }
-      for (let y = 0; y < ch; y += gridSize) {
-        ctx.beginPath()
-        ctx.moveTo(0, y)
-        ctx.lineTo(cw, y)
-        ctx.stroke()
-      }
-      ctx.restore()
-
-      // Glowing orbs
-      ctx.save()
-      ctx.globalCompositeOperation = 'lighter'
-      orbs.forEach((orb, i) => {
-        const px = (orb.x + Math.sin(tick * 0.0006 + i * 2.1) * 0.05) * cw
-        const py = (orb.y + Math.cos(tick * 0.0008 + i * 1.4) * 0.04) * ch
-        const pr = orb.r * Math.max(cw, ch)
-
-        const grad = ctx.createRadialGradient(px, py, 0, px, py, pr)
-        grad.addColorStop(0, orb.color)
-        grad.addColorStop(1, 'transparent')
-
-        ctx.fillStyle = grad
-        ctx.beginPath()
-        ctx.arc(px, py, pr, 0, Math.PI * 2)
-        ctx.fill()
-      })
-      ctx.restore()
-
-      // Concentric ring accent
-      ctx.save()
-      ctx.strokeStyle = 'rgba(255,255,255,0.05)'
-      ctx.lineWidth = 0.75
-      const cx = cw * 0.8
-      const cy = ch * 0.32
-      const cr = ch * 0.55
-      const wob = reduceMotion ? 0 : 1
-      for (const m of [1, 0.66, 0.32]) {
-        ctx.beginPath()
-        ctx.arc(cx + Math.sin(tick * 0.0005) * 8 * wob, cy + Math.cos(tick * 0.0005) * 6 * wob, cr * m, 0, Math.PI * 2)
-        ctx.stroke()
-      }
-      ctx.restore()
-
-      if (!reduceMotion) {
-        tick++
-        raf = requestAnimationFrame(draw)
-      }
-    }
-
-    resize()
-    draw()
-    window.addEventListener('resize', resize)
-
-    return () => {
-      cancelAnimationFrame(raf)
-      window.removeEventListener('resize', resize)
-    }
-  }, [])
+  const booted = bootShown >= BOOT_LINES.length
 
   return (
     <section
       id="hero"
+      className={`crt crt-flicker${powerOn ? ' crt-power-on' : ''}`}
+      onClick={() => inputRef.current?.focus({ preventScroll: true })}
       style={{
         position: 'relative',
         minHeight: '100svh',
         display: 'flex',
         flexDirection: 'column',
-        justifyContent: 'flex-end',
+        justifyContent: 'center',
         overflow: 'hidden',
-        background: 'var(--color-bg)',
+        cursor: 'text',
       }}
     >
-      <canvas
-        ref={canvasRef}
-        style={{ position: 'absolute', inset: 0, width: '100%', height: '100%' }}
-      />
+      <h1 className="sr-only">Zach Brewer — Software Engineer</h1>
 
-      {/* Vignette to anchor text */}
+      {/* Phosphor glow bed */}
       <div
         aria-hidden="true"
         style={{
           position: 'absolute',
           inset: 0,
           background:
-            'radial-gradient(120% 80% at 50% 100%, rgba(8,8,10,0.85) 0%, rgba(8,8,10,0) 60%)',
+            'radial-gradient(90% 65% at 50% 42%, rgba(70,247,143,0.075) 0%, rgba(70,247,143,0.02) 45%, transparent 70%)',
+          pointerEvents: 'none',
         }}
       />
 
@@ -136,102 +226,169 @@ export default function Hero() {
         style={{
           position: 'relative',
           zIndex: 1,
-          maxWidth: '1240px',
+          maxWidth: '1100px',
           margin: '0 auto',
-          padding: '6rem 2rem 6rem',
+          padding: '6.5rem 1.5rem 4.5rem',
           width: '100%',
+          fontFamily: 'var(--font-mono)',
+          color: 'var(--color-phosphor)',
         }}
       >
-        <p className="eyebrow" style={{ marginBottom: '2rem' }}>
-          Software Engineer · AI · Craft
-        </p>
-
-        <h1
+        {/* Boot log */}
+        <div
+          aria-hidden="true"
           style={{
-            fontFamily: 'var(--font-display)',
-            fontWeight: 700,
-            fontSize: 'clamp(3.25rem, 10vw, 8.5rem)',
-            lineHeight: 0.95,
-            letterSpacing: '-0.03em',
-            color: 'var(--color-text)',
+            fontSize: 'clamp(0.6rem, 1.4vw, 0.74rem)',
+            lineHeight: 1.75,
+            letterSpacing: '0.05em',
+            color: 'var(--color-phosphor-dim)',
+            minHeight: `${BOOT_LINES.length * 1.75 * 0.72}rem`,
+            marginBottom: '2rem',
+            textShadow: '0 0 6px rgba(70,247,143,0.35)',
+          }}
+        >
+          {BOOT_LINES.slice(0, bootShown).map((line, i) => (
+            <div key={i}>{line}</div>
+          ))}
+        </div>
+
+        {/* ASCII wordmark */}
+        <div
+          aria-hidden="true"
+          style={{
+            opacity: nameShown ? 1 : 0,
+            transition: 'opacity 0.35s steps(3)',
+            textShadow: '0 0 14px rgba(70,247,143,0.5), 0 0 40px rgba(70,247,143,0.18)',
             marginBottom: '2.25rem',
           }}
         >
-          Zach Brewer
-        </h1>
+          <pre
+            style={{
+              fontFamily: 'var(--font-mono)',
+              fontWeight: 700,
+              fontSize: 'clamp(9px, 2.6vw, 22px)',
+              lineHeight: 1.05,
+              margin: 0,
+            }}
+          >
+            {ASCII_ZACH}
+          </pre>
+          <pre
+            style={{
+              fontFamily: 'var(--font-mono)',
+              fontWeight: 700,
+              fontSize: 'clamp(9px, 2.6vw, 22px)',
+              lineHeight: 1.05,
+              margin: '0.6em 0 0',
+            }}
+          >
+            {ASCII_BREWER}
+          </pre>
+        </div>
 
-        <div
+        {/* Tagline */}
+        <p
           style={{
-            display: 'flex',
-            alignItems: 'flex-end',
-            justifyContent: 'space-between',
-            flexWrap: 'wrap',
-            gap: '1.5rem',
+            fontSize: 'clamp(0.78rem, 1.8vw, 0.95rem)',
+            lineHeight: 1.8,
+            letterSpacing: '0.02em',
+            maxWidth: '58ch',
+            color: 'var(--color-phosphor)',
+            opacity: nameShown ? 0.92 : 0,
+            transition: 'opacity 0.4s steps(3)',
+            textShadow: '0 0 8px rgba(70,247,143,0.3)',
+            marginBottom: '2.5rem',
           }}
         >
-          <p
-            style={{
-              fontSize: '1.15rem',
-              fontWeight: 300,
-              color: 'var(--color-text-muted)',
-              maxWidth: '42ch',
-              lineHeight: 1.65,
-            }}
-          >
-            A software engineer with 10+ years building across enterprise finance,
-            full-stack web, and game development —{' '}
-            <span className="accent-gradient" style={{ fontWeight: 500 }}>
-              obsessed with the craft
-            </span>{' '}
-            and what's now possible with modern AI.
-          </p>
+          SOFTWARE ENGINEER · 10+ YRS · ENTERPRISE FINANCE / FULL-STACK WEB /
+          GAME DEV — <span style={{ color: 'var(--color-sakura)' }}>OBSESSED WITH THE CRAFT</span>{' '}
+          AND WHAT'S NOW POSSIBLE WITH MODERN AI.
+        </p>
 
-          <a
-            href="#experience"
+        {/* Interactive terminal */}
+        <div
+          style={{
+            border: '1px solid rgba(70,247,143,0.25)',
+            borderRadius: '4px',
+            background: 'rgba(0, 12, 5, 0.55)',
+            padding: '0.9rem 1rem',
+            fontSize: 'clamp(0.72rem, 1.6vw, 0.85rem)',
+            lineHeight: 1.7,
+            opacity: booted ? 1 : 0.25,
+            transition: 'opacity 0.3s',
+          }}
+        >
+          <div
+            ref={historyRef}
             style={{
-              display: 'inline-flex',
-              alignItems: 'center',
-              gap: '0.6rem',
-              fontFamily: 'var(--font-mono)',
-              fontSize: '0.8rem',
-              letterSpacing: '0.04em',
-              textTransform: 'uppercase',
-              color: 'var(--color-text)',
-              textDecoration: 'none',
-              border: '1px solid var(--color-border-strong)',
-              borderRadius: '99px',
-              padding: '0.7rem 1.25rem',
-              transition: 'border-color 0.25s, background 0.25s',
-              whiteSpace: 'nowrap',
-            }}
-            onMouseEnter={(e) => {
-              e.currentTarget.style.borderColor = 'var(--color-accent)'
-              e.currentTarget.style.background = 'rgba(124,107,255,0.12)'
-            }}
-            onMouseLeave={(e) => {
-              e.currentTarget.style.borderColor = 'var(--color-border-strong)'
-              e.currentTarget.style.background = 'transparent'
+              maxHeight: '10.5em',
+              overflowY: 'auto',
+              whiteSpace: 'pre-wrap',
+              wordBreak: 'break-word',
+              color: 'var(--color-phosphor)',
+              opacity: 0.85,
             }}
           >
-            View experience
-            <svg width="14" height="14" viewBox="0 0 14 14" fill="none">
-              <path d="M2 7h10M7 2l5 5-5 5" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" />
-            </svg>
-          </a>
+            {history.map((line, i) => (
+              <div key={i}>{line}</div>
+            ))}
+          </div>
+          <div style={{ display: 'flex', alignItems: 'baseline', gap: '0.5ch' }}>
+            <label htmlFor="zb-terminal" style={{ whiteSpace: 'nowrap', opacity: 0.9 }}>
+              visitor@zb-s370:~$
+            </label>
+            <input
+              id="zb-terminal"
+              ref={inputRef}
+              type="text"
+              value={input}
+              onChange={(e) => setInput(e.target.value)}
+              onKeyDown={(e) => {
+                if (e.key === 'Enter') run(input)
+              }}
+              placeholder="type 'help'"
+              autoComplete="off"
+              autoCapitalize="off"
+              spellCheck={false}
+              aria-label="Interactive terminal — type help for available commands"
+              style={{
+                flex: 1,
+                background: 'transparent',
+                border: 'none',
+                outline: 'none',
+                font: 'inherit',
+                color: 'var(--color-phosphor)',
+                caretColor: 'var(--color-phosphor)',
+                textShadow: '0 0 8px rgba(70,247,143,0.3)',
+                minWidth: '8ch',
+              }}
+            />
+          </div>
         </div>
       </div>
 
-      <div
-        aria-hidden="true"
+      {/* Scroll hint */}
+      <a
+        href="#experience"
         style={{
           position: 'absolute',
-          bottom: 0,
-          left: 0,
-          right: 0,
-          height: '1px',
-          background: 'var(--color-border)',
+          bottom: '1.5rem',
+          left: '50%',
+          transform: 'translateX(-50%)',
+          zIndex: 1,
+          fontFamily: 'var(--font-mono)',
+          fontSize: '0.66rem',
+          letterSpacing: '0.22em',
+          color: 'var(--color-phosphor-dim)',
+          textDecoration: 'none',
+          whiteSpace: 'nowrap',
         }}
-      />
+      >
+        ▼ SCROLL TO BEGIN MIGRATION{' '}
+        <span className="cursor-blink" aria-hidden="true">
+          ▮
+        </span>
+      </a>
     </section>
   )
 }
