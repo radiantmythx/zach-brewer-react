@@ -1,43 +1,43 @@
-import { frameDims, makeLayout, type Frame, type Layout } from './layout'
-import { blend, makePts, N, type Pts } from './line'
-import { clamp, mixRgb, rgba, seg, smoothstep, WHITE, type RGB } from './math'
-import { mixStyle, MONO, type LineStyle, type Scene, type SceneEnv } from './scene'
+import { font, MONO } from './kit'
+import { clamp, hash, hexToRgb, noise1, rgba } from './math'
+import type { Env, FX, Scene } from './scene'
 import { codeScene } from './scenes/code'
 import { designScene } from './scenes/design'
 import { gameScene } from './scenes/game'
 import { musicScene } from './scenes/music'
-import { CHAPTER, CHAPTERS, LOOP, wrap } from './timeline'
+import { openScene } from './scenes/open'
+import { resolveScene } from './scenes/resolve'
+import { BEAT, REEL_END, SECTIONS } from './timeline'
 
-const SCENES: Scene[] = [codeScene, designScene, gameScene, musicScene]
-/** line hand-off half-window at each chapter boundary */
-const HANDOFF = 0.25
-/** overlays of neighbouring chapters keep drawing this close to a boundary */
-const OVERLAP = 0.6
+const SCENES: Record<string, Scene> = {
+  open: openScene,
+  code: codeScene,
+  design: designScene,
+  game: gameScene,
+  music: musicScene,
+  resolve: resolveScene,
+}
 
 export interface FilmCallbacks {
-  onFrame?: (t: number, chapter: number, progress: number) => void
+  onFrame?: (t: number) => void
 }
 
 /*
- * The film renderer. Time is the only input: now() comes from the wall clock,
- * or from the Web Audio clock while the score is playing so picture and sound
- * can never drift. Rendering pauses when the hero is offscreen; time doesn't.
+ * The reel renderer. Time is the only input: now() comes from the wall
+ * clock, or from the Web Audio clock while the score plays, so picture and
+ * sound can't drift. Each frame: gather camera/post FX from the active
+ * scenes → draw them under the camera → HUD → glitch → bloom → flash.
  */
 export class FilmEngine {
   private canvas: HTMLCanvasElement
   private g: CanvasRenderingContext2D
-  private trail: HTMLCanvasElement
-  private tg: CanvasRenderingContext2D
-  private W = 0
+  private chain: HTMLCanvasElement[] = []
+  private chainG: CanvasRenderingContext2D[] = []
   private dpr = 1
-  private ox = 0
-  private oy = 0
-  private f!: Frame
-  private L!: Layout
-  private env!: SceneEnv
-  private A = makePts()
-  private B = makePts()
-  private C = makePts()
+  private env: Env
+  private fx: FX = { flash: 0, flashColor: '#FFFFFF', shake: 0, zoom: 1, rot: 0, glitch: 0, bloom: 1 }
+  private safe = { top: 80, bottom: 0, idleBottom: 0 }
+  private hasSafe = false
 
   private clock: (() => number) | null = null
   private wallBase = performance.now()
@@ -46,8 +46,8 @@ export class FilmEngine {
   private raf = 0
   private running = false
   private lastWall = 0
+  private frameCount = 0
   private fps = 60
-  private trailAcc = 0
   private mouse = { tx: 0, ty: 0, x: 0, y: 0 }
   private cb: FilmCallbacks
   debug = false
@@ -58,10 +58,14 @@ export class FilmEngine {
     const g = canvas.getContext('2d', { alpha: true })
     if (!g) throw new Error('2D canvas unavailable')
     this.g = g
-    this.trail = document.createElement('canvas')
-    const tg = this.trail.getContext('2d')
-    if (!tg) throw new Error('2D canvas unavailable')
-    this.tg = tg
+    for (let i = 0; i < 4; i++) {
+      const c = document.createElement('canvas')
+      const cg = c.getContext('2d')
+      if (!cg) throw new Error('2D canvas unavailable')
+      this.chain.push(c)
+      this.chainG.push(cg)
+    }
+    this.env = { W: 1, H: 1, cx: 0, cy: 0, U: 1, portrait: false, top: 0, bottom: 1, logo: { x: 0, y: 0, size: 100 }, time: 0, mx: 0, my: 0, debug: false }
     this.resize()
   }
 
@@ -102,8 +106,6 @@ export class FilmEngine {
     this.filmBase = t
     this.wallBase = performance.now()
     if (this.pausedAt !== null) this.pausedAt = t
-    this.tg.setTransform(1, 0, 0, 1, 0, 0)
-    this.tg.clearRect(0, 0, this.trail.width, this.trail.height)
     if (!this.running) this.render(this.now(), 1 / 60)
   }
 
@@ -136,16 +138,11 @@ export class FilmEngine {
     const dt = this.lastWall ? clamp((wall - this.lastWall) / 1000, 1 / 240, 0.1) : 1 / 60
     this.lastWall = wall
     this.fps += (1 / dt - this.fps) * 0.05
-    this.render(this.now(), dt)
-  }
-
-  private safe: { top: number; bottom: number } | null = null
-
-  /** Keep the choreographed frame between `top` and `bottom` (CSS px within the canvas). */
-  setSafeArea(top: number, bottom: number) {
-    if (this.safe && Math.abs(this.safe.top - top) < 1 && Math.abs(this.safe.bottom - bottom) < 1) return
-    this.safe = { top, bottom }
-    this.resize()
+    const t = this.now()
+    // The idle state is gentle — 30 fps is plenty and saves battery.
+    this.frameCount++
+    if (t > REEL_END + 1 && !this.debug && this.frameCount % 2 === 1) return
+    this.render(t, dt)
   }
 
   pointer(nx: number, ny: number) {
@@ -155,255 +152,170 @@ export class FilmEngine {
 
   /* ---- layout ---- */
 
+  /** The reel plays between `top` and `bottom`; the resolved logo rests above `idleBottom`. */
+  setSafeArea(top: number, bottom: number, idleBottom: number) {
+    const s = this.safe
+    if (this.hasSafe && Math.abs(s.top - top) < 1 && Math.abs(s.bottom - bottom) < 1 && Math.abs(s.idleBottom - idleBottom) < 1) return
+    this.safe = { top, bottom, idleBottom }
+    this.hasSafe = true
+    this.resize()
+  }
+
   resize() {
     const W = this.canvas.clientWidth || 1
     const H = this.canvas.clientHeight || 1
-    this.W = W
     this.dpr = Math.min(window.devicePixelRatio || 1, 2)
     this.canvas.width = Math.round(W * this.dpr)
     this.canvas.height = Math.round(H * this.dpr)
-    const ts = Math.min(1, this.dpr * 0.5)
-    this.trail.width = Math.max(1, Math.round(W * ts))
-    this.trail.height = Math.max(1, Math.round(H * ts))
+    this.chain.forEach((c, i) => {
+      const d = 2 ** (i + 1)
+      c.width = Math.max(1, Math.ceil(this.canvas.width / d))
+      c.height = Math.max(1, Math.ceil(this.canvas.height / d))
+    })
 
-    // The film plays in the region between the nav and the hero's type block
-    // (measured by the page via setSafeArea), with percentage fallbacks.
-    const tall = W / H < 1
-    const fx = W * 0.04
-    const fw = W * 0.92
-    let fy = H * (tall ? 0.11 : 0.09)
-    let fh = H * (tall ? 0.5 : 0.56)
-    if (this.safe) {
-      fy = Math.max(this.safe.top, H * 0.06)
-      fh = Math.max(140, Math.min(H * 0.6, this.safe.bottom - fy))
-    }
-    const portrait = fw / fh < 1.15
-    const fd = frameDims(portrait)
-    const scale = Math.min(fw / fd.w, fh / fd.h)
-    this.ox = fx + (fw - fd.w * scale) / 2
-    this.oy = fy + (fh - fd.h * scale) / 2
-    this.f = {
-      w: fd.w,
-      h: fd.h,
+    const top = this.hasSafe ? this.safe.top : H * 0.09
+    const bottom = this.hasSafe ? this.safe.bottom : H * 0.9
+    const idleBottom = this.hasSafe ? this.safe.idleBottom : H * 0.6
+    const h = Math.max(120, bottom - top)
+    const portrait = W / h < 0.9
+    const U = portrait ? Math.min(W / 900, h / 1400) : Math.min(W / 1600, h / 900)
+    const ih = Math.max(80, idleBottom - top)
+    const size = clamp(Math.min(ih * 0.8, W * 0.5), 84, 360)
+    Object.assign(this.env, {
+      W,
+      H,
+      cx: W / 2,
+      cy: top + h / 2,
+      U,
       portrait,
-      scale,
-      px: 1 / scale,
-      visL: -this.ox / scale,
-      visR: (W - this.ox) / scale,
-      visT: -this.oy / scale,
-      visB: (H - this.oy) / scale,
-    }
-    this.L = makeLayout(this.f)
-    this.env = { f: this.f, L: this.L, px: this.f.px, cw: this.L.code.font * 0.6, time: 0, debug: false }
+      top,
+      bottom,
+      logo: { x: W / 2, y: top + ih / 2, size },
+    })
     if (!this.running) this.render(this.now(), 1 / 60)
   }
 
   /* ---- render ---- */
 
-  private camera(g: CanvasRenderingContext2D, depth: number, res: number) {
-    const s = this.f.scale * res
-    const mx = this.mouse.x * 10 * depth
-    const my = this.mouse.y * 7 * depth
-    g.setTransform(s, 0, 0, s, (this.ox + mx) * res, (this.oy + my) * res)
-  }
-
-  private colorAt(T: number): RGB {
-    const t = wrap(T)
-    const k = Math.floor(t / CHAPTER) % 4
-    const tau = t - k * CHAPTER
-    if (tau < 0.6) return mixRgb(CHAPTERS[(k + 3) % 4].rgb, CHAPTERS[k].rgb, seg(tau + CHAPTER, 7, 8.6))
-    return mixRgb(CHAPTERS[k].rgb, CHAPTERS[(k + 1) % 4].rgb, seg(tau, 7, 8.6))
+  private active(T: number) {
+    const b = T / BEAT
+    return SECTIONS.filter((s) => b >= s.from - 0.25 && (b < s.to + 0.25 || s.id === 'resolve'))
   }
 
   render(T: number, dt: number) {
-    const { g, f, env } = this
-    const Tm = wrap(T)
-    const k = Math.min(3, Math.floor(Tm / CHAPTER))
-    const tau = Tm - k * CHAPTER
-    const prevK = (k + 3) % 4
-    const nextK = (k + 1) % 4
-
+    const { g, env, fx } = this
+    T = Math.max(0, T)
     env.time = T
     env.debug = this.debug
-    g.font = `${this.L.code.font}px ${MONO}`
-    env.cw = g.measureText('0').width
-
-    const ease = 1 - Math.exp(-dt * 2.5)
+    const ease = 1 - Math.exp(-dt * 3)
     this.mouse.x += (this.mouse.tx - this.mouse.x) * ease
     this.mouse.y += (this.mouse.ty - this.mouse.y) * ease
+    env.mx = this.mouse.x
+    env.my = this.mouse.y
 
-    // --- the line, with hand-offs at chapter boundaries ---
-    let st: LineStyle = SCENES[k].line(tau, env, this.A)
-    let pts: Pts = this.A
-    if (tau > CHAPTER - HANDOFF) {
-      const s2 = SCENES[nextK].line(tau - CHAPTER, env, this.B)
-      const w = smoothstep((tau - (CHAPTER - HANDOFF)) / (2 * HANDOFF))
-      blend(this.A, this.B, w, this.C, 0)
-      st = mixStyle(st, s2, w)
-      pts = this.C
-    } else if (tau < HANDOFF) {
-      const s0 = SCENES[prevK].line(tau + CHAPTER, env, this.B)
-      const w = smoothstep((tau + HANDOFF) / (2 * HANDOFF))
-      blend(this.B, this.A, w, this.C, 0)
-      st = mixStyle(s0, st, w)
-      pts = this.C
-    }
+    const secs = this.active(T)
+    Object.assign(fx, { flash: 0, flashColor: '#FFFFFF', shake: 0, zoom: 1, rot: 0, glitch: 0, bloom: 1 })
+    for (const s of secs) SCENES[s.id].fx?.(T - s.from * BEAT, env, fx)
 
-    const tail = this.colorAt(T - 0.35)
-    const head = this.colorAt(T + 0.45)
-
+    const d = this.dpr
     g.setTransform(1, 0, 0, 1, 0, 0)
     g.globalCompositeOperation = 'source-over'
+    g.globalAlpha = 1
     g.clearRect(0, 0, this.canvas.width, this.canvas.height)
 
-    // --- background layers (deeper parallax) ---
-    this.camera(g, 1.8, this.dpr)
-    this.eachActive(k, tau, (s, t) => s.back?.(g, t, env))
+    // --- world, under the camera ---
+    const sh = Math.min(40, fx.shake)
+    const sx = sh * noise1(T * 31)
+    const sy = sh * noise1(T * 37 + 50)
+    g.setTransform(d, 0, 0, d, 0, 0)
+    g.translate(env.cx + sx, env.cy + sy)
+    if (fx.rot) g.rotate(fx.rot)
+    g.scale(fx.zoom, fx.zoom)
+    g.translate(-env.cx, -env.cy)
+    for (const s of secs) SCENES[s.id].draw(g, T - s.from * BEAT, env)
 
-    // --- long-exposure trail, at half resolution ---
-    // Fades are batched to ~30 Hz: at high refresh rates a per-frame fade is so
-    // small that 8-bit rounding never reaches zero and leaves ghost residue.
-    const tg = this.tg
-    const tres = this.trail.width / this.W
-    this.trailAcc += dt
-    if (this.trailAcc >= 1 / 30) {
-      tg.setTransform(1, 0, 0, 1, 0, 0)
-      tg.globalCompositeOperation = 'destination-out'
-      tg.fillStyle = `rgba(0,0,0,${(1 - Math.exp(-this.trailAcc / 0.085)).toFixed(3)})`
-      tg.fillRect(0, 0, this.trail.width, this.trail.height)
-      this.trailAcc = 0
-    }
-    tg.globalCompositeOperation = 'lighter'
-    this.camera(tg, 1, tres)
-    const path = this.path(pts)
-    this.strokePass(tg, path, pts, st, tail, head, 6, 0.22 * Math.min(1, dt * 60), 0.1)
+    // --- HUD, steady ---
+    g.setTransform(d, 0, 0, d, 0, 0)
+    for (const s of secs) SCENES[s.id].hud?.(g, T - s.from * BEAT, env)
 
-    g.setTransform(1, 0, 0, 1, 0, 0)
-    g.globalCompositeOperation = 'lighter'
-    g.drawImage(this.trail, 0, 0, this.canvas.width, this.canvas.height)
-
-    // --- the line itself: halo → glow → body → hot core ---
-    this.camera(g, 1, this.dpr)
-    g.lineCap = 'round'
-    g.lineJoin = 'round'
-    this.strokePass(g, path, pts, st, tail, head, 26, 0.05, 0)
-    this.strokePass(g, path, pts, st, tail, head, 9, 0.13, 0.1)
-    this.strokePass(g, path, pts, st, tail, head, 3, 0.9, 0.35)
-    this.strokePass(g, path, pts, st, tail, head, 1.2, 0.85, 0.8)
-    if (st.head > 0.01) {
-      const hx = pts[2 * (N - 1)]
-      const hy = pts[2 * (N - 1) + 1]
-      const r = 40 * f.px
-      const gr = g.createRadialGradient(hx, hy, 0, hx, hy, r)
-      gr.addColorStop(0, rgba(mixRgb(head, WHITE, 0.6), 0.9 * st.head * st.alpha))
-      gr.addColorStop(0.2, rgba(head, 0.3 * st.head * st.alpha))
-      gr.addColorStop(1, rgba(head, 0))
-      g.fillStyle = gr
-      g.fillRect(hx - r, hy - r, r * 2, r * 2)
-    }
-    g.globalCompositeOperation = 'source-over'
-
-    // --- overlays ---
-    this.eachActive(k, tau, (s, t) => s.front?.(g, t, env))
-
-    if (this.debug) this.drawDebug(pts, k, tau, T)
-    this.cb.onFrame?.(Tm, k, tau / CHAPTER)
-  }
-
-  private eachActive(k: number, tau: number, fn: (s: Scene, t: number) => void) {
-    if (tau < OVERLAP) fn(SCENES[(k + 3) % 4], tau + CHAPTER)
-    fn(SCENES[k], tau)
-    if (tau > CHAPTER - OVERLAP) fn(SCENES[(k + 1) % 4], tau - CHAPTER)
-  }
-
-  private path(pts: Pts) {
-    const p = new Path2D()
-    p.moveTo(pts[0], pts[1])
-    for (let i = 1; i < N; i++) p.lineTo(pts[2 * i], pts[2 * i + 1])
-    return p
-  }
-
-  private strokePass(
-    g: CanvasRenderingContext2D,
-    path: Path2D,
-    pts: Pts,
-    st: LineStyle,
-    tail: RGB,
-    head: RGB,
-    widthPx: number,
-    alpha: number,
-    lighten: number,
-  ) {
-    const a = alpha * st.alpha
-    if (a <= 0.002) return
-    let x0 = pts[0]
-    const y0 = pts[1]
-    let x1 = pts[2 * (N - 1)]
-    let y1 = pts[2 * (N - 1) + 1]
-    if (Math.hypot(x1 - x0, y1 - y0) < 60) {
-      // near-closed shapes: sweep the gradient across the bounding width
-      let lo = Infinity
-      let hi = -Infinity
-      for (let i = 0; i < N; i += 8) {
-        lo = Math.min(lo, pts[2 * i])
-        hi = Math.max(hi, pts[2 * i])
+    // --- glitch slices ---
+    if (fx.glitch > 0.02) {
+      g.setTransform(1, 0, 0, 1, 0, 0)
+      const cw = this.canvas.width
+      const ch = this.canvas.height
+      const f = Math.floor(T * 30)
+      for (let k = 0; k < 7; k++) {
+        const y = hash(k * 3.1 + f) * ch
+        const h = (0.015 + hash(k * 7.7 + f) * 0.07) * ch
+        const off = (hash(k * 5.3 + f) - 0.5) * 160 * d * clamp(fx.glitch)
+        g.drawImage(this.canvas, 0, y, cw, h, off, y, cw, h)
       }
-      x0 = lo
-      x1 = hi + 1
-      y1 = y0
     }
-    const c0 = mixRgb(tail, WHITE, lighten)
-    const c1 = mixRgb(head, WHITE, lighten)
-    const gr = g.createLinearGradient(x0, y0, x1, y1)
-    const fe = clamp(st.fade, 0, 0.45)
-    if (fe > 0.002) {
-      gr.addColorStop(0, rgba(c0, 0))
-      gr.addColorStop(fe, rgba(mixRgb(c0, c1, fe), a))
-      gr.addColorStop(1 - fe, rgba(mixRgb(c0, c1, 1 - fe), a))
-      gr.addColorStop(1, rgba(c1, 0))
-    } else {
-      gr.addColorStop(0, rgba(c0, a))
-      gr.addColorStop(1, rgba(c1, a))
+
+    // --- bloom: progressive downsample, add back the soft levels ---
+    const b = clamp(fx.bloom, 0, 3)
+    if (b > 0.01) {
+      let src: HTMLCanvasElement = this.canvas
+      for (let i = 0; i < this.chain.length; i++) {
+        const c = this.chain[i]
+        const cg = this.chainG[i]
+        cg.globalCompositeOperation = 'copy'
+        cg.drawImage(src, 0, 0, c.width, c.height)
+        src = c
+      }
+      g.setTransform(1, 0, 0, 1, 0, 0)
+      g.globalCompositeOperation = 'lighter'
+      const cw = this.canvas.width
+      const ch = this.canvas.height
+      g.globalAlpha = clamp(0.35 * b)
+      g.drawImage(this.chain[1], 0, 0, cw, ch)
+      g.globalAlpha = clamp(0.45 * b)
+      g.drawImage(this.chain[2], 0, 0, cw, ch)
+      g.globalAlpha = clamp(0.55 * b)
+      g.drawImage(this.chain[3], 0, 0, cw, ch)
+      g.globalAlpha = 1
+      g.globalCompositeOperation = 'source-over'
     }
-    g.strokeStyle = gr
-    g.lineWidth = widthPx * this.f.px
-    g.lineCap = 'round'
-    g.lineJoin = 'round'
-    g.stroke(path)
+
+    // --- flash frame ---
+    if (fx.flash > 0.003) {
+      g.setTransform(1, 0, 0, 1, 0, 0)
+      g.fillStyle = rgba(hexToRgb(fx.flashColor), clamp(fx.flash))
+      g.fillRect(0, 0, this.canvas.width, this.canvas.height)
+    }
+
+    if (this.debug) this.drawDebug(T, secs.map((s) => s.id))
+    this.cb.onFrame?.(T)
   }
 
-  /** Director's commentary: the rig behind the film. */
-  private drawDebug(pts: Pts, k: number, tau: number, T: number) {
-    const { g, f, env } = this
-    this.camera(g, 1, this.dpr)
-    g.font = `${10 * f.px}px ${MONO}`
-    g.textBaseline = 'middle'
-    for (let i = 0; i < N; i += 26) {
-      const x = pts[2 * i]
-      const y = pts[2 * i + 1]
-      g.strokeStyle = 'rgba(255,79,216,0.9)'
-      g.lineWidth = f.px
-      g.beginPath()
-      g.arc(x, y, 3 * f.px, 0, Math.PI * 2)
-      g.stroke()
-      g.fillStyle = 'rgba(255,79,216,0.8)'
-      g.fillText((i / (N - 1)).toFixed(2), x + 6 * f.px, y - 8 * f.px)
-    }
-    SCENES[k].debug?.(g, tau, env)
-
-    g.strokeStyle = 'rgba(255,255,255,0.18)'
-    g.setLineDash([6 * f.px, 6 * f.px])
-    g.strokeRect(0, 0, f.w, f.h)
-    g.setLineDash([])
-
+  /** Director's commentary: the rig behind the reel. */
+  private drawDebug(T: number, ids: string[]) {
+    const { g, env } = this
     g.setTransform(this.dpr, 0, 0, this.dpr, 0, 0)
-    g.font = `11px ${MONO}`
+    for (const s of SECTIONS) if (ids.includes(s.id)) SCENES[s.id].debug?.(g, T - s.from * BEAT, env)
+    g.strokeStyle = 'rgba(255,79,216,0.5)'
+    g.setLineDash([6, 6])
+    g.strokeRect(8, env.top, env.W - 16, env.bottom - env.top)
+    g.setLineDash([])
+    const lb = T / BEAT
+    g.font = font(11, 500, MONO)
+    g.textAlign = 'left'
+    g.textBaseline = 'middle'
     g.fillStyle = 'rgba(255,79,216,0.95)'
+    const sec = SECTIONS.find((s) => lb >= s.from && lb < s.to)?.id ?? 'idle'
     const lines = [
       `DIRECTOR'S COMMENTARY`,
-      `t ${wrap(T).toFixed(2)}s / ${LOOP}s   chapter ${k + 1}/4 ${CHAPTERS[k].id}   τ ${tau.toFixed(2)}`,
-      `${Math.round(this.fps)} fps   ${N} points   frame ${f.w}×${f.h} @ ${f.scale.toFixed(3)}   ${this.clock ? 'audio clock' : 'wall clock'}`,
+      `t ${T.toFixed(2)}s   bar ${Math.floor(lb / 4) + 1}.${(Math.floor(lb) % 4) + 1}   beat ${lb.toFixed(2)}   ${sec}`,
+      `${Math.round(this.fps)} fps   ${this.clock ? 'audio clock' : 'wall clock'}   U ${env.U.toFixed(3)}   ${env.portrait ? 'portrait' : 'landscape'}`,
     ]
-    lines.forEach((l, i) => g.fillText(l, 20, 90 + i * 16))
+    lines.forEach((l, i) => g.fillText(l, 20, env.top + 60 + i * 16))
+    // beat grid ticker
+    const w = env.W - 40
+    const y = env.bottom - 8
+    g.fillStyle = 'rgba(255,79,216,0.3)'
+    g.fillRect(20, y, w, 1)
+    for (let b = 0; b <= 52; b++) g.fillRect(20 + (b / 52) * w, y - (b % 4 ? 3 : 7), 1, b % 4 ? 3 : 7)
+    g.fillStyle = 'rgba(255,79,216,1)'
+    g.fillRect(20 + clamp(lb / 52) * w - 1, y - 12, 2, 14)
   }
 }

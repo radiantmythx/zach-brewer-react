@@ -1,352 +1,264 @@
-import type { Box } from '../layout'
-import { makePts, pathLength, resample, type PathFn, type Pts, type Vec } from '../line'
-import {
-  bez,
-  clamp,
-  cubicBezierEase,
-  easeInOutCubic,
-  easeOutCubic,
-  invLerp,
-  lerp,
-  rgba,
-  seg,
-  win,
-  WHITE,
-  type RGB,
-} from '../math'
-import { glowDot, MONO, partialLine, roundRect, style, uiFont, type Scene, type SceneEnv } from '../scene'
-import { CHAPTERS } from '../timeline'
+import { burst, col, decay, dot, font, glow, hits, MONO, ring, SERIF, slate, titleCard } from '../kit'
+import { clamp, easeInCubic, easeOutExpo, hash, lerp, seg, springOut } from '../math'
+import type { Env, Scene } from '../scene'
+import { BEAT, NEON } from '../timeline'
 
 /*
- * CHAPTER 01 — PROGRAMMING
- * The line begins as a text caret. Code types itself out; then the caret
- * leaps across the frame as a comet and plots the very easing curve the code
- * just defined. The curve glides to center stage to become chapter two.
+ * 01 PROGRAMMING — beats 8–16.
+ * Code rains past in three depth layers while a function assembles itself,
+ * one token per eighth note, each flying in and landing with a spark. RUN
+ * scans it, giant braces clap it shut, it glitches while compiling, and every
+ * glyph spirals into a single point — which becomes the design pen.
  */
 
-const SRC = [
-  '// every motion starts as math',
-  'const ease = cubicBezier(',
-  '  0.65, 0, 0.35, 1',
-  ')',
-  '',
-  'function draw(t) {',
-  '  line.to(t, ease(t))',
-  '}',
+const B = BEAT
+
+type Kind = 'kw' | 'fn' | 'param' | 'op' | 'num' | 'punct'
+const COLOR: Record<Kind, string> = {
+  kw: NEON.blue,
+  fn: NEON.mint,
+  param: NEON.white,
+  op: '#9FB3C8',
+  num: NEON.lime,
+  punct: '#9FB3C8',
+}
+
+const TOKENS: { line: number; text: string; kind: Kind; at: number }[] = [
+  { line: 0, text: 'function', kind: 'kw', at: 0.5 },
+  { line: 0, text: ' play', kind: 'fn', at: 0.75 },
+  { line: 0, text: '(beat)', kind: 'param', at: 1.0 },
+  { line: 0, text: ' {', kind: 'punct', at: 1.5 },
+  { line: 1, text: '  return', kind: 'kw', at: 2.0 },
+  { line: 1, text: ' ease', kind: 'fn', at: 2.25 },
+  { line: 1, text: '(beat)', kind: 'param', at: 2.5 },
+  { line: 1, text: ' *', kind: 'op', at: 2.75 },
+  { line: 1, text: ' 128', kind: 'num', at: 3.0 },
+  { line: 2, text: '}', kind: 'punct', at: 3.5 },
+]
+/** beat times (local) the soundtrack uses for token hits */
+export const CODE_TOKEN_BEATS = TOKENS.map((t) => t.at)
+
+const RAIN = [
+  'const scene = await load(reel)',
+  'for (const e of enemies) e.update(dt)',
+  'export function mix(a, b, t) {',
+  'ctx.globalCompositeOperation = "lighter"',
+  'if (hp <= 0) return shatter(boss)',
+  'return springOut(t, 3.2, 0.45)',
+  'query { profile { name craft } }',
+  'await deploy({ env: "prod" })',
+  'bloom.push(downsample(frame))',
+  'const hue = lerp(blue, mint, k)',
+  'type Beat = { at: number; hit: () => void }',
+  'osc.frequency.exponentialRampToValueAtTime',
+  'shapes.map(s => snap(s, grid))',
+  'while (running) render(now())',
+  'public async Task<Result> Run()',
+  'services.AddGraphQLServer()',
+  'git commit -m "ship it"',
+  'grid.cells.filter(c => c.walkable)',
 ]
 
-type Kind = 'plain' | 'comment' | 'keyword' | 'number' | 'fn' | 'punct'
-
-const BLUE = CHAPTERS[0].rgb
-const KIND_COLOR: Record<Kind, RGB> = {
-  plain: [232, 230, 224],
-  comment: [104, 110, 124],
-  keyword: BLUE,
-  number: CHAPTERS[3].rgb,
-  fn: CHAPTERS[2].rgb,
-  punct: [138, 142, 154],
-}
+const GLITCH = '!<>-_/\\[]{}=+*^?#01%&$'
 
 interface Glyph {
   ch: string
-  line: number
-  col: number
-  kind: Kind
-  t: number
+  x: number
+  y: number
+  color: string
+  at: number
+  tok: number
 }
 
-export const TYPE_START = 0.5
-const LEAP = 4.1
-const DRAWN = 6.0
-const MOVE = [7.1, 8.0] as const
+function layout(g: CanvasRenderingContext2D, env: Env) {
+  const fs = (env.portrait ? 38 : 54) * env.U
+  g.font = font(fs, 500, MONO)
+  const cw = g.measureText('0').width
+  const lh = fs * 1.55
+  const longest = 25
+  const left = env.cx - (longest * cw) / 2
+  const top = env.cy - lh
+  const glyphs: Glyph[] = []
+  const tokenCenters: { x: number; y: number }[] = []
+  const col0 = [0, 0, 0]
+  TOKENS.forEach((tk, ti) => {
+    const start = col0[tk.line]
+    const y = top + tk.line * lh
+    for (let i = 0; i < tk.text.length; i++) {
+      const ch = tk.text[i]
+      if (ch !== ' ') glyphs.push({ ch, x: left + (start + i + 0.5) * cw, y, color: COLOR[tk.kind], at: tk.at, tok: ti })
+    }
+    const trimmed = tk.text.trimStart()
+    const lead = tk.text.length - trimmed.length
+    tokenCenters.push({ x: left + (start + lead + trimmed.length / 2) * cw, y })
+    col0[tk.line] += tk.text.length
+  })
+  return { fs, cw, lh, left, top, right: left + longest * cw, bottom: top + 2 * lh, glyphs, tokenCenters }
+}
 
-/** Token start times — the soundtrack turns these into keystroke ticks. */
-export const CODE_TICKS: number[] = []
-
-const GLYPHS: Glyph[] = (() => {
-  const out: Glyph[] = []
-  const re = /(\/\/.*$)|\b(const|function|return)\b|(\d+(?:\.\d+)?)|([A-Za-z_]\w*)(?=\()|([A-Za-z_]\w*)|(\s+)|([^\sA-Za-z_\d])/g
-  let t = TYPE_START
-  SRC.forEach((src, line) => {
-    re.lastIndex = 0
-    let m: RegExpExecArray | null
-    while ((m = re.exec(src))) {
-      const kind: Kind = m[1]
-        ? 'comment'
-        : m[2]
-          ? 'keyword'
-          : m[3]
-            ? 'number'
-            : m[4]
-              ? 'fn'
-              : m[5] || m[6]
-                ? 'plain'
-                : 'punct'
-      const ws = !!m[6]
-      if (!ws) CODE_TICKS.push(t)
-      for (let i = 0; i < m[0].length; i++) {
-        out.push({ ch: m[0][i], line, col: m.index + i, kind, t })
-        t += ws ? 0.012 : kind === 'comment' ? 0.017 : 0.021
+function rain(g: CanvasRenderingContext2D, env: Env, t: number, alpha: number) {
+  if (alpha <= 0.003) return
+  const layers = [
+    { size: 12, a: 0.045, speed: 70 },
+    { size: 15, a: 0.07, speed: 150 },
+    { size: 19, a: 0.1, speed: 280 },
+  ]
+  g.textAlign = 'left'
+  g.textBaseline = 'middle'
+  layers.forEach((L, li) => {
+    g.font = font(L.size, 400, MONO)
+    const lh = L.size * 2.2
+    const rows = Math.ceil(env.H / lh) + 2
+    const total = rows * lh
+    const shift = t * L.speed
+    for (let row = 0; row < rows; row++) {
+      const y = ((((row * lh - shift) % total) + total) % total) - lh
+      for (let k = 0; k < 2; k++) {
+        const h = hash(row * 17.3 + k * 91.7 + li * 311)
+        const text = RAIN[Math.floor(h * RAIN.length)]
+        const x = hash(row * 5.1 + k * 13.7 + li * 7) * env.W * 0.9 - 40
+        const c = h > 0.66 ? NEON.mint : h > 0.33 ? NEON.blue : NEON.cyan
+        g.fillStyle = col(c, L.a * alpha * (0.5 + hash(row + k) * 0.5))
+        g.fillText(text, x, y)
       }
     }
-    t += src.length === 0 ? 0.06 : line === 0 ? 0.24 : 0.11
   })
-  return out
-})()
-
-export const TYPE_END = GLYPHS[GLYPHS.length - 1].t
-
-/* ---- geometry ---- */
-
-const lerpBox = (a: Box, b: Box, t: number): Box => ({
-  x: lerp(a.x, b.x, t),
-  y: lerp(a.y, b.y, t),
-  w: lerp(a.w, b.w, t),
-  h: lerp(a.h, b.h, t),
-})
-
-function graphBox(t: number, env: SceneEnv): Box {
-  return lerpBox(env.L.graph, env.L.design, seg(t, MOVE[0], MOVE[1], easeInOutCubic))
-}
-
-/** The ease-in-out curve cubic-bezier(0.65, 0, 0.35, 1) inside box G. */
-function curveFn(G: Box): PathFn {
-  return (s, o) => {
-    o.x = bez(G.x, G.x + 0.65 * G.w, G.x + 0.35 * G.w, G.x + G.w, s)
-    o.y = bez(G.y + G.h, G.y + G.h, G.y, G.y, s)
-  }
-}
-
-function caretPos(t: number, env: SceneEnv, o: Vec) {
-  const { code } = env.L
-  let i = 0
-  while (i < GLYPHS.length && GLYPHS[i].t <= t) i++
-  const at = (idx: number, v: Vec) => {
-    if (idx <= 0) {
-      v.x = code.x
-      v.y = code.y + code.lh / 2
-      return
-    }
-    const gph = GLYPHS[idx - 1]
-    v.x = code.x + (gph.col + 1) * env.cw
-    v.y = code.y + gph.line * code.lh + code.lh / 2
-  }
-  at(i, o)
-  if (i > 0) {
-    const prev = { x: 0, y: 0 }
-    at(i - 1, prev)
-    const k = easeOutCubic(clamp((t - GLYPHS[i - 1].t) / 0.06))
-    o.x = lerp(prev.x, o.x, k)
-    o.y = lerp(prev.y, o.y, k)
-  }
-}
-
-const tmpA = makePts()
-const caretV: Vec = { x: 0, y: 0 }
-
-function writeCaret(x: number, y: number, h: number, out: Pts) {
-  const n = out.length / 2
-  for (let k = 0; k < n; k++) {
-    out[2 * k] = x
-    out[2 * k + 1] = y - h / 2 + (h * k) / (n - 1)
-  }
 }
 
 export const codeScene: Scene = {
-  line(t, env, out) {
-    const { L } = env
-    if (t < LEAP) {
-      caretPos(t, env, caretV)
-      writeCaret(caretV.x, caretV.y, L.caret.h, out)
-      // Solid while typing; a soft blink once the code is written.
-      const phase = t - TYPE_END - 0.25
-      const blink = phase > 0 ? 0.25 + 0.75 * (0.5 + 0.5 * Math.cos((phase / 1.06) * Math.PI * 2)) : 1
-      return style(blink, 0, 0)
-    }
+  id: 'code',
 
-    const G = graphBox(t, env)
-    const curve = curveFn(G)
-    if (t >= DRAWN) {
-      resample(curve, out)
-      return style(1, 0, 0)
-    }
-
-    // Leap + draw: the visible line is the [tail, head] window of a single
-    // path — an arc from the caret to the graph origin, then the curve.
-    caretPos(LEAP, env, caretV)
-    const cx = caretV.x
-    const cy = caretV.y
-    const ox = G.x
-    const oy = G.y + G.h
-    const qx = (cx + ox) / 2
-    const qy = Math.min(cy, oy) - (env.f.portrait ? 120 : 230)
-    const arc: PathFn = (s, o) => {
-      const m = 1 - s
-      o.x = m * m * cx + 2 * m * s * qx + s * s * ox
-      o.y = m * m * cy + 2 * m * s * qy + s * s * oy
-    }
-    const composite: PathFn = (s, o) => (s < 0.5 ? arc(s * 2, o) : curve((s - 0.5) * 2, o))
-    const la = pathLength(arc)
-    const lc = pathLength(curve)
-    const total = la + lc
-    const head = total * easeInOutCubic(invLerp(LEAP, DRAWN, t))
-    const tail = clamp(head - la * 0.55, 0, la)
-    resample(composite, out, tail / total, Math.max(head, tail + 0.01) / total)
-
-    // Melt the vertical caret into the comet over the first 0.12s.
-    const k = seg(t, LEAP, LEAP + 0.12)
-    if (k < 1) {
-      writeCaret(cx, cy, L.caret.h, tmpA)
-      for (let i = 0; i < out.length; i++) out[i] = lerp(tmpA[i], out[i], k)
-    }
-    return style(1, win(t, LEAP, LEAP + 0.2, DRAWN - 0.35, DRAWN), 0)
+  fx(t, _env, fx) {
+    const lb = t / B
+    if (lb < -0.2 || lb > 8.2) return
+    fx.flash += hits(lb, [0], 0.4, 14) + hits(lb, [4], 0.18, 14)
+    fx.shake += hits(lb, CODE_TOKEN_BEATS.map((b) => b + 0.1), 2.5, 16) + hits(lb, [4.6, 4.85], 5, 12) + hits(lb, [5, 5.5], 9, 10)
+    fx.zoom *= 1 + hits(lb, [0], 0.05, 8) + hits(lb, [5, 5.5], 0.03, 10) - 0.04 * seg(lb, 6.5, 7.8, easeInCubic)
+    fx.glitch += lb >= 5.6 && lb < 6.5 ? 0.35 + 0.35 * hash(Math.floor(t * 20)) : 0
+    fx.bloom += 0.4 * seg(lb, 7, 7.9)
   },
 
-  back(g, t, env) {
-    // Current-line highlight while typing, like an editor.
-    const a = win(t, TYPE_START - 0.2, TYPE_START, TYPE_END + 0.2, LEAP)
-    if (a <= 0) return
-    const { code } = env.L
-    caretPos(t, env, caretV)
-    g.fillStyle = `rgba(255,255,255,${0.028 * a})`
-    g.fillRect(code.x - 12 * env.px, caretV.y - code.lh / 2, 31 * env.cw + 24 * env.px, code.lh)
-  },
+  draw(g, t, env) {
+    const lb = t / B
+    if (lb < 0 || lb >= 8) return
+    const L = layout(g, env)
+    const implode = seg(lb, 6.5, 7.75, easeInCubic)
 
-  front(g, t, env) {
-    if (t < -0.2 || t > 8.6) return
-    const { code } = env.L
-    const px = env.px
+    rain(g, env, t, clamp(lb / 0.4) * (1 - seg(lb, 6.2, 7.2)))
+    titleCard(g, env, lb, 'CODE', NEON.blue)
+    glow(g, env.cx, env.cy, 640 * env.U, NEON.blue, 0.12 * (1 - implode))
 
-    // --- the source -------------------------------------------------------
-    const dim = 1 - 0.4 * seg(t, LEAP, LEAP + 0.5)
-    g.textBaseline = 'middle'
-    g.textAlign = 'left'
-    g.font = `${code.font}px ${MONO}`
-
-    // file tab + gutter
-    const chromeA = win(t, 0, 0.5, 6.1, 6.7) * 0.9
-    if (chromeA > 0) {
-      g.font = uiFont(env, 11)
-      g.fillStyle = rgba(BLUE, 0.7 * chromeA)
-      g.beginPath()
-      g.arc(code.x + 3 * px, code.y - 30 * px, 2.5 * px, 0, Math.PI * 2)
-      g.fill()
-      g.fillStyle = `rgba(255,255,255,${0.42 * chromeA})`
-      g.fillText('motion.ts', code.x + 12 * px, code.y - 30 * px)
-      g.textAlign = 'right'
-      g.font = uiFont(env, 11)
-      for (let ln = 0; ln < SRC.length; ln++) {
-        const first = GLYPHS.find((gl) => gl.line >= ln)
-        if (!first || first.t > t + 0.02) continue
-        g.fillStyle = `rgba(255,255,255,${0.16 * chromeA})`
-        g.fillText(String(ln + 1), code.x - 18 * px, code.y + ln * code.lh + code.lh / 2)
-      }
-      g.textAlign = 'left'
-      g.font = `${code.font}px ${MONO}`
-    }
-
-    // highlight the four numbers — they become bezier handles next chapter
-    const hl = win(t, LEAP + 0.2, LEAP + 0.6, 6.0, 6.6)
-    if (hl > 0) {
-      const y = code.y + 2 * code.lh
-      roundRect(g, code.x + 1.6 * env.cw, y + 4, 16.8 * env.cw, code.lh - 8, 6 * px)
-      g.fillStyle = rgba(CHAPTERS[1].rgb, 0.12 * hl)
-      g.fill()
-      g.strokeStyle = rgba(CHAPTERS[1].rgb, 0.35 * hl)
-      g.lineWidth = px
-      g.stroke()
-    }
-
-    for (const gl of GLYPHS) {
-      if (gl.t > t) break
-      const appear = clamp((t - gl.t) / 0.09)
-      const out = 1 - seg(t, 6.15 + gl.line * 0.05, 6.75 + gl.line * 0.05)
-      const a = appear * out * dim
-      if (a <= 0.003) continue
-      const lift = (1 - appear) * 6 + (1 - out) * -10
-      g.fillStyle = rgba(KIND_COLOR[gl.kind], a * (gl.kind === 'plain' ? 0.92 : 1))
-      g.fillText(gl.ch, code.x + gl.col * env.cw, code.y + gl.line * code.lh + code.lh / 2 + lift)
-    }
-
-    // --- the graph --------------------------------------------------------
-    const G = graphBox(t, env)
-    const ox = G.x
-    const oy = G.y + G.h
-    const axes = seg(t, LEAP + 0.3, LEAP + 0.9)
-    const axesA = axes * (1 - seg(t, 6.9, 7.4)) * 0.3
-    if (axesA > 0.002) {
-      g.strokeStyle = `rgba(255,255,255,${axesA})`
-      g.lineWidth = px
-      g.beginPath()
-      partialLine(g, ox, oy, ox + G.w + 26 * px, oy, axes)
-      partialLine(g, ox, oy, ox, G.y - 26 * px, axes)
-      g.stroke()
-
-      g.setLineDash([3 * px, 5 * px])
-      g.strokeStyle = `rgba(255,255,255,${axesA * 0.45})`
-      g.beginPath()
-      partialLine(g, ox, G.y, ox + G.w, G.y, axes)
-      partialLine(g, ox + G.w, oy, ox + G.w, G.y, axes)
-      g.stroke()
-      g.setLineDash([])
-
-      g.font = uiFont(env, 11)
-      g.fillStyle = `rgba(255,255,255,${axesA * 1.6})`
-      g.textAlign = 'left'
-      g.fillText('t', ox + G.w + 34 * px, oy)
-      // portrait tucks the label inside the plot, clear of the code above
-      if (env.f.portrait) g.fillText('ease(t)', ox + 10 * px, G.y + 12 * px)
-      else g.fillText('ease(t)', ox - 4 * px, G.y - 40 * px)
-      g.textAlign = 'right'
-      g.fillText('0', ox - 10 * px, oy + 12 * px)
-      g.fillText('1', ox - 10 * px, G.y)
+    // --- giant serif braces swing in and clap -------------------------------------
+    const braceSize = (env.portrait ? 360 : 520) * env.U
+    const brace = (ch: string, side: -1 | 1, at: number) => {
+      const p = springOut(t - at * B, 2.6, 0.45)
+      if (p <= 0) return
+      const clap = hits(lb, [5, 5.5], 1, 9)
+      const home = side < 0 ? L.left - 0.2 * braceSize : L.right + 0.2 * braceSize
+      let x = lerp(env.cx + side * env.W * 0.7, home, p) - side * clap * 34 * env.U
+      let y = env.cy - L.lh * 0.1
+      x = lerp(x, env.cx, implode)
+      y = lerp(y, env.cy, implode)
+      g.save()
+      g.translate(x, y)
+      g.rotate((1 - clamp(p)) * side * 1.1 + implode * side * 2.5)
+      g.scale(1 - implode, 1 - implode)
+      g.font = font(braceSize, 400, SERIF)
       g.textAlign = 'center'
-      g.fillText('1', ox + G.w, oy + 18 * px)
+      g.textBaseline = 'middle'
+      g.fillStyle = col(NEON.cyan, 0.95)
+      g.fillText(ch, 0, 0)
+      g.restore()
+    }
+    brace('{', -1, 4.5)
+    brace('}', 1, 4.75)
+
+    // --- the function ----------------------------------------------------------------
+    g.font = font(L.fs, 500, MONO)
+    g.textAlign = 'center'
+    g.textBaseline = 'middle'
+    const scanY = lerp(L.top - L.lh, L.bottom + L.lh, seg(lb, 4, 4.6))
+    const scanning = lb >= 4 && lb < 4.6
+    const glitching = lb >= 5.6 && lb < 6.6
+    for (let i = 0; i < L.glyphs.length; i++) {
+      const gl = L.glyphs[i]
+      const tk = L.tokenCenters[gl.tok]
+      const p = springOut(t - gl.at * B, 3.4, 0.5)
+      if (p <= 0) continue
+      const h = hash(gl.tok * 7.7 + 1)
+      const ang = h * Math.PI * 2
+      const from = 760 * env.U
+      // fly in as a token (relative to the token centre), then settle
+      let x = gl.x + Math.cos(ang) * from * (1 - p)
+      let y = gl.y + Math.sin(ang) * from * (1 - p)
+      const rot = (1 - clamp(p)) * (hash(gl.tok * 3.1) - 0.5) * 2.4
+      let s = lerp(2.4, 1, clamp(p))
+      if (implode > 0) {
+        const dx = x - env.cx
+        const dy = y - env.cy
+        const a = Math.atan2(dy, dx) + implode * 3.2
+        const r = Math.hypot(dx, dy) * (1 - implode)
+        x = env.cx + Math.cos(a) * r
+        y = env.cy + Math.sin(a) * r
+        s *= 1 - implode * 0.85
+      }
+      let ch = gl.ch
+      let c = gl.color
+      if (scanning && gl.y < scanY) c = NEON.white
+      if (glitching && hash(i * 3.7 + Math.floor(t * 24)) < 0.32) {
+        ch = GLITCH[Math.floor(hash(i + Math.floor(t * 30)) * GLITCH.length)]
+        x += (hash(i * 9 + Math.floor(t * 30)) - 0.5) * 18 * env.U
+        c = hash(i) > 0.5 ? NEON.hot : NEON.cyan
+      }
+      if (implode > 0.6) c = NEON.white
+      g.save()
+      g.translate(x, y)
+      if (rot) g.rotate(rot + ((gl.x - tk.x) / 900) * (1 - clamp(p)))
+      g.scale(s, s)
+      g.fillStyle = c
+      g.globalAlpha = clamp(p * 3)
+      g.fillText(ch, 0, 0)
+      g.restore()
     }
 
-    // --- playhead demo: linear time vs. eased position ---------------------
-    const demo = win(t, 5.85, 6.1, 7.0, 7.3)
-    if (demo > 0.002) {
-      const p = invLerp(6.05, 7.0, t)
-      const e = cubicBezierEase(0.65, 0, 0.35, 1, p)
-      const x = ox + p * G.w
-      const y = oy - e * G.h
-      g.strokeStyle = rgba(BLUE, 0.4 * demo)
-      g.lineWidth = px
-      g.beginPath()
-      g.moveTo(x, oy)
-      g.lineTo(x, y)
-      g.stroke()
-      glowDot(g, x, y, 16 * px, BLUE, demo)
-      g.fillStyle = rgba(WHITE, demo)
-      g.beginPath()
-      g.arc(x, y, 3 * px, 0, Math.PI * 2)
-      g.fill()
+    // landing sparks for every token
+    L.tokenCenters.forEach((c, i) => {
+      const dt = t - TOKENS[i].at * B - 0.1
+      burst(g, c.x, c.y, dt, { n: 10, seed: i + 20, speed: 520 * env.U, life: 0.4, size: 3, color: COLOR[TOKENS[i].kind], kind: 'streak' })
+    })
 
-      const ty1 = oy + (env.f.portrait ? 32 : 52) * px
-      const ty2 = ty1 + (env.f.portrait ? 18 : 22) * px
-      g.strokeStyle = `rgba(255,255,255,${0.14 * demo})`
-      g.beginPath()
-      g.moveTo(ox, ty1)
-      g.lineTo(ox + G.w, ty1)
-      g.moveTo(ox, ty2)
-      g.lineTo(ox + G.w, ty2)
-      g.stroke()
-      g.font = uiFont(env, 10)
-      g.textAlign = 'right'
-      g.fillStyle = `rgba(255,255,255,${0.4 * demo})`
-      g.fillText('linear', ox - 12 * px, ty1)
-      g.fillText('eased', ox - 12 * px, ty2)
-      g.strokeStyle = `rgba(255,255,255,${0.5 * demo})`
-      g.beginPath()
-      g.arc(ox + p * G.w, ty1, 3.5 * px, 0, Math.PI * 2)
-      g.stroke()
-      glowDot(g, ox + e * G.w, ty2, 14 * px, BLUE, demo)
-      g.fillStyle = rgba(WHITE, demo)
-      g.beginPath()
-      g.arc(ox + e * G.w, ty2, 3.5 * px, 0, Math.PI * 2)
-      g.fill()
+    // RUN: scan bar, label, progress
+    if (scanning) {
+      g.fillStyle = col(NEON.mint, 0.9)
+      g.fillRect(L.left - 40 * env.U, scanY, L.right - L.left + 80 * env.U, 2)
+      glow(g, env.cx, scanY, 400 * env.U, NEON.mint, 0.18)
     }
-    g.textAlign = 'left'
+    const runA = clamp((lb - 4) / 0.15) * (1 - seg(lb, 6.2, 6.6))
+    if (runA > 0) {
+      const y = L.bottom + L.lh * 0.95
+      g.globalAlpha = runA
+      g.font = font(13, 500, MONO)
+      g.textAlign = 'left'
+      g.fillStyle = NEON.mint
+      const prog = seg(lb, 4, 5.2, easeOutExpo)
+      g.fillText(prog < 1 ? '▶ RUN' : '✓ compiled in 12 ms', L.left, y)
+      g.fillStyle = col(NEON.white, 0.15)
+      g.fillRect(L.left, y + 16, L.right - L.left, 2)
+      g.fillStyle = NEON.mint
+      g.fillRect(L.left, y + 16, (L.right - L.left) * prog, 2)
+      g.globalAlpha = 1
+    }
+
+    // the singularity
+    if (implode > 0) {
+      const r = lerp(2, 9, implode) * env.U * (1 + decay(t, 7.75 * B, 1.5, 10))
+      glow(g, env.cx, env.cy, 140 * env.U * implode, NEON.cyan, 0.7 * implode)
+      dot(g, env.cx, env.cy, r, NEON.white)
+      if (lb > 7.2) ring(g, env.cx, env.cy, (1 - seg(lb, 7.2, 7.95)) * 180 * env.U, 1.5, col(NEON.white, 0.5 * seg(lb, 7.2, 7.5)))
+    }
+  },
+
+  hud(g, t, env) {
+    slate(g, env, t / B, '01', 'Programming', NEON.blue)
   },
 }

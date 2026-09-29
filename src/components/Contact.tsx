@@ -9,7 +9,7 @@ const LINKS = [
   { label: 'LinkedIn', href: 'https://www.linkedin.com/in/zachary-brewer-88653269/' },
 ]
 
-const HUES = ['#7C9DFF', '#FF6B4A', '#3FE0A0', '#FFC24D']
+const HUES = ['#5CA8FF', '#3DE3F5', '#3DFFA8', '#B8FF5C']
 
 /*
  * The film's line, handed to the visitor: a 1-D wave-equation string you can

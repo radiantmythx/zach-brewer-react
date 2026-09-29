@@ -1,40 +1,53 @@
 @import "tailwindcss";
 
 /*
- * Design system — "one line".
- * A dark cinematic stage for the film, then a warm editorial page. Type:
- * Instrument Serif (display), Geist (text), Geist Mono (labels, film UI).
- * Color is rationed: ink on paper, one vermilion accent, and four discipline
- * hues that only appear where something moves.
+ * Design system — a kinetic reel on a dark stage, then a calm editorial page
+ * in earth tones: mist whites, deep blue-slate ink, moss and ocean greens.
+ * Type: Unbounded (kinetic / wordmark), Instrument Serif (editorial display),
+ * Geist (text), Geist Mono (labels). Neon only lives where things move.
  */
 @theme {
   --font-sans: 'Geist', system-ui, -apple-system, 'Segoe UI', sans-serif;
   --font-display: 'Instrument Serif', 'Iowan Old Style', 'Times New Roman', serif;
+  --font-kinetic: 'Unbounded', 'Arial Black', system-ui, sans-serif;
   --font-mono: 'Geist Mono', ui-monospace, 'SFMono-Regular', Menlo, Consolas, monospace;
 
-  --color-paper: #f2efe8;
-  --color-paper-2: #e9e5dc;
-  --color-ink: #131312;
-  --color-ink-2: #3a3935;
-  --color-muted: #77736a;
-  --color-rule: rgba(19, 19, 18, 0.13);
-  --color-film: #08080a;
-  --color-film-2: #111114;
+  /* page: mist whites, blue-slate ink, moss and ocean */
+  --color-paper: #f3f6f2;
+  --color-paper-2: #e3ebe5;
+  --color-ink: #122630;
+  --color-ink-2: #3a4f58;
+  --color-muted: #6c7f86;
+  --color-rule: rgba(18, 38, 48, 0.13);
+  --color-film: #05080d;
+  --color-film-2: #0c1418;
 
-  --color-code: #7c9dff;
-  --color-design: #ff6b4a;
-  --color-game: #3fe0a0;
-  --color-music: #ffc24d;
+  --color-ocean: #2b6a93;
+  --color-sky: #7fb6d9;
+  --color-lagoon: #1f8a86;
+  --color-moss: #3f7a55;
+  --color-sage: #9db9a0;
+  --color-fern: #6f952f;
 
-  --color-accent: #ff5a36;
-  --color-accent-bright: #ff7c5e;
+  /* disciplines on the page (earthy) and in the film (neon) */
+  --color-code: #2b6a93;
+  --color-design: #1f8a86;
+  --color-game: #3f7a55;
+  --color-music: #6f952f;
+  --neon-blue: #5ca8ff;
+  --neon-cyan: #3de3f5;
+  --neon-mint: #3dffa8;
+  --neon-lime: #b8ff5c;
+
+  --color-accent: #3f7a55;
+  --color-accent-bright: #2b6a93;
 
   /* dark tokens, used by the résumé lightbox */
-  --color-bg: #0b0b0d;
-  --color-bg-elev: #141417;
-  --color-bg-elev-2: #1c1c20;
-  --color-text: #f4f3ef;
-  --color-text-muted: #a3a19a;
+  --color-bg: #0a1216;
+  --color-bg-elev: #111b20;
+  --color-bg-elev-2: #17242a;
+  --color-text: #eef4f1;
+  --color-text-muted: #9fb0b3;
   --color-border: rgba(255, 255, 255, 0.1);
 
   --ease-expo: cubic-bezier(0.16, 1, 0.3, 1);
@@ -237,8 +250,8 @@ button {
 }
 
 .nav-mark svg {
-  width: 22px;
-  height: 22px;
+  width: 26px;
+  height: 26px;
 }
 
 .nav-links {
@@ -333,8 +346,8 @@ button {
   inset: 0;
   pointer-events: none;
   background:
-    radial-gradient(120% 95% at 50% 38%, transparent 55%, rgba(0, 0, 0, 0.55) 100%),
-    linear-gradient(to top, rgba(8, 8, 10, 0.92) 0%, rgba(8, 8, 10, 0.55) 22%, transparent 42%);
+    radial-gradient(120% 95% at 50% 40%, transparent 58%, rgba(0, 0, 0, 0.55) 100%),
+    linear-gradient(to top, rgba(5, 8, 13, 0.85) 0%, rgba(5, 8, 13, 0.4) 20%, transparent 38%);
 }
 
 .hero-inner {
@@ -343,9 +356,10 @@ button {
   right: var(--pad);
   bottom: calc(clamp(64px, 9vh, 88px) + 12px);
   display: flex;
+  flex-wrap: wrap;
   align-items: flex-end;
   justify-content: space-between;
-  gap: 32px;
+  gap: 20px 32px;
   opacity: calc(1 - var(--p) * 0.7);
   transform: translateY(calc(var(--p) * -24px));
 }
@@ -367,24 +381,104 @@ button {
   width: 7px;
   height: 7px;
   border-radius: 50%;
-  background: var(--chapter, var(--color-code));
-  box-shadow: 0 0 12px var(--chapter, var(--color-code));
+  background: var(--chapter, var(--neon-cyan));
+  box-shadow: 0 0 12px var(--chapter, var(--neon-cyan));
   transition:
     background-color 0.8s,
     box-shadow 0.8s;
 }
 
 .hero-title {
-  font-family: var(--font-display);
-  font-weight: 400;
-  font-size: clamp(3.8rem, 10.6vw, 10.4rem);
-  line-height: 0.86;
-  letter-spacing: -0.022em;
-  margin-left: -0.04em;
+  font-family: var(--font-kinetic);
+  font-weight: 800;
+  font-size: clamp(2.1rem, 7vw, 7.2rem);
+  line-height: 0.92;
+  letter-spacing: -0.01em;
+  text-transform: uppercase;
+  white-space: nowrap;
+}
+
+.hero-title span {
+  display: inline-block;
+}
+
+.hero-title .sp {
+  width: 0.28em;
+}
+
+/* the reel holds the copy back; the logo snap brings it in */
+.js .hero:not(.is-ready) .hero-copy {
+  opacity: 0;
+  animation: failsafe 0.01s 2.5s forwards;
+}
+
+@keyframes failsafe {
+  to {
+    opacity: 1;
+  }
+}
+
+.hero.is-reel .hero-copy {
+  opacity: 0;
+  pointer-events: none;
+}
+
+.hero.is-ready.is-resolved .hero-title span {
+  animation: slam 0.62s var(--ease-expo) both;
+  animation-delay: calc(var(--i) * 36ms);
+}
+
+.hero.is-ready.is-resolved .hero-title {
+  animation: title-glow 1.4s var(--ease-out) both;
+}
+
+.hero.is-ready.is-resolved .hero-kicker {
+  animation: rise 0.8s var(--ease-expo) 0.3s both;
+}
+
+.hero.is-ready.is-resolved .hero-sub {
+  animation: rise 0.9s var(--ease-expo) 0.55s both;
+}
+
+@keyframes slam {
+  0% {
+    opacity: 0;
+    transform: translateY(-0.55em) scale(1.9);
+    filter: blur(10px);
+  }
+  55% {
+    opacity: 1;
+    transform: translateY(0.05em) scale(0.95);
+    filter: blur(0);
+  }
+  100% {
+    opacity: 1;
+    transform: none;
+  }
+}
+
+@keyframes title-glow {
+  0% {
+    text-shadow: 0 0 36px rgba(61, 227, 245, 0.95), 0 0 80px rgba(61, 255, 168, 0.5);
+  }
+  100% {
+    text-shadow: 0 0 0 rgba(61, 227, 245, 0);
+  }
+}
+
+@keyframes rise {
+  from {
+    opacity: 0;
+    transform: translateY(14px);
+  }
+  to {
+    opacity: 1;
+    transform: none;
+  }
 }
 
 .hero-sub {
-  max-width: 46ch;
+  max-width: 50ch;
   margin-top: clamp(14px, 2.2vh, 26px);
   font-size: clamp(15px, 1.15vw, 17px);
   line-height: 1.55;
@@ -395,6 +489,7 @@ button {
   display: flex;
   gap: 10px;
   flex-shrink: 0;
+  margin-left: auto;
 }
 
 .pill {
@@ -582,7 +677,7 @@ button {
 }
 
 .statement em {
-  color: var(--color-accent);
+  color: var(--color-moss);
 }
 
 .facts {
@@ -654,7 +749,7 @@ button {
 
 .scribble path {
   fill: none;
-  stroke: var(--color-accent);
+  stroke: var(--color-lagoon);
   stroke-width: 3;
   stroke-linecap: round;
   stroke-dasharray: 1;
@@ -695,7 +790,7 @@ button {
   content: '';
   position: absolute;
   inset: 0;
-  background: radial-gradient(80% 70% at 50% 45%, color-mix(in srgb, var(--c) 18%, transparent), transparent 70%);
+  background: radial-gradient(80% 70% at 50% 45%, color-mix(in srgb, var(--glow, var(--c)) 16%, transparent), transparent 70%);
   opacity: 0.5;
   transition: opacity 0.6s;
   pointer-events: none;
@@ -879,7 +974,7 @@ button {
   inset: 0;
   transform-origin: top;
   transform: scaleY(var(--xp, 0));
-  background: linear-gradient(var(--color-code), var(--color-design), var(--color-game), var(--color-music));
+  background: linear-gradient(var(--color-ocean), var(--color-lagoon), var(--color-moss), var(--color-fern));
 }
 
 .xp-row {
@@ -930,7 +1025,7 @@ button {
   align-items: center;
   gap: 6px;
   font-weight: 500;
-  color: var(--color-accent);
+  color: var(--color-moss);
   margin-top: 8px;
 }
 
@@ -992,7 +1087,10 @@ button {
 
 .contact {
   position: relative;
-  background: var(--color-film);
+  background:
+    radial-gradient(90% 70% at 85% 10%, rgba(43, 106, 147, 0.35), transparent 60%),
+    radial-gradient(80% 60% at 10% 100%, rgba(63, 122, 85, 0.35), transparent 60%),
+    linear-gradient(165deg, #0a1822 0%, #0c2226 50%, #0e261d 100%);
   color: #fff;
   padding-top: clamp(110px, 14vw, 200px);
   overflow: clip;
@@ -1088,7 +1186,7 @@ button {
   opacity: 0;
   padding: 12px 18px;
   border-radius: 999px;
-  background: rgba(10, 10, 12, 0.92);
+  background: rgba(10, 18, 22, 0.94);
   color: #fff;
   font-family: var(--font-mono);
   font-size: 12px;
@@ -1106,7 +1204,7 @@ button {
 }
 
 .toast b {
-  color: #ff4fd8;
+  color: var(--neon-mint);
   font-weight: 500;
 }
 
@@ -1125,5 +1223,11 @@ button {
   .line > span,
   .scribble path {
     transition: none !important;
+  }
+  .hero .hero-title span,
+  .hero .hero-title,
+  .hero .hero-kicker,
+  .hero .hero-sub {
+    animation: none !important;
   }
 }

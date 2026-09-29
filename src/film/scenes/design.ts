@@ -1,496 +1,326 @@
-import type { Box, Layout } from '../layout'
-import { blend, makePts, resample, uncurl, type PathFn } from '../line'
-import {
-  bez,
-  clamp,
-  cubicBezierEase,
-  easeInOutCubic,
-  easeInOutSine,
-  easeOutBack,
-  easeOutCubic,
-  lerp,
-  rgba,
-  seg,
-  springOut,
-  win,
-  WHITE,
-  type RGB,
-} from '../math'
-import { MONO, roundRect, SANS, setSpacing, style, uiFont, type Scene, type SceneEnv } from '../scene'
-import { CHAPTERS } from '../timeline'
+import { bez, clamp, easeInCubic, easeInOutCubic, easeOutCubic, easeOutExpo, hash, lerp, seg, springOut, TAU } from '../math'
+import { burst, col, DISPLAY, font, glow, hits, MONO, polyPath, SERIF, slate, titleCard } from '../kit'
+import type { Env, Scene } from '../scene'
+import { BEAT, NEON } from '../timeline'
 
 /*
- * CHAPTER 02 — DESIGN
- * The easing curve is now a vector path on an infinite canvas. Anchors and
- * handles pop in, a cursor drags the handles (the properties panel updates
- * live), a bounding box snaps to smart guides — then the path re-routes
- * itself into a golden spiral and unrolls into the horizon of chapter three.
+ * 02 DESIGN — beats 16–24.
+ * The code's singularity becomes a pen: one fast swoosh with anchors and
+ * handles. A modular grid shoots in, shapes snap into it on the beat with
+ * bounding boxes and smart guides, a type specimen slams in and cycles
+ * typefaces, a palette pops and recolours everything — then the hexagon
+ * zooms through the lens and becomes the game's floor.
  */
 
-const CORAL = CHAPTERS[1].rgb
-const GUIDE: RGB = [255, 79, 216]
+const B = BEAT
 
-export const DESIGN_EVENTS = {
-  anchors: [0.05, 0.3],
-  press: [1.4, 3.1],
-  release: [2.6, 4.1],
-  bbox: 4.15,
-  golden: 5.0,
-  goldenLines: 5.3,
-  morph: [5.3, 6.5] as const,
-  unfurl: [6.9, 8.0] as const,
+// pen swoosh: three cubic segments, in composition units around centre
+const SWOOSH: [number, number][][] = [
+  [[0, 0], [220, -270], [540, -250], [580, -40]],
+  [[580, -40], [620, 170], [300, 310], [0, 230]],
+  [[0, 230], [-330, 150], [-620, -110], [-540, -300]],
+]
+
+const SHAPES = [
+  { kind: 3 as const, cell: [0, 0], at: 2 },
+  { kind: 4 as const, cell: [1, 1], at: 2.5 },
+  { kind: 0 as const, cell: [2, 0], at: 3 },
+  { kind: 6 as const, cell: [3, 1], at: 3.5 },
+]
+export const DESIGN_SNAP_BEATS = SHAPES.map((s) => s.at)
+const SWATCHES = [NEON.blue, NEON.cyan, NEON.mint, NEON.lime, NEON.hot]
+export const DESIGN_SWATCH_BEATS = SWATCHES.map((_, i) => 5 + i * 0.25)
+const FACES = [
+  { name: 'Instrument Serif', family: SERIF, weight: 400, style: '' },
+  { name: 'Unbounded 900', family: DISPLAY, weight: 900, style: '' },
+  { name: 'Geist Mono', family: MONO, weight: 500, style: '' },
+  { name: 'Instrument Serif Italic', family: SERIF, weight: 400, style: 'italic' },
+]
+
+function geom(env: Env) {
+  const p = env.portrait
+  const grid = p ? { x0: -400, x1: 400, y0: -560, y1: -60 } : { x0: -730, x1: -50, y0: -270, y1: 270 }
+  const cols = 4
+  const rows = 2
+  const cw = (grid.x1 - grid.x0) / cols
+  const ch = (grid.y1 - grid.y0) / rows
+  const spec = p ? { x: 0, y: 300 } : { x: 390, y: 10 }
+  const swatchY = p ? 600 : 380
+  const swatchX = p ? 0 : -390
+  return { grid, cols, rows, cw, ch, spec, swatchY, swatchX, r: Math.min(cw, ch) * 0.34 }
 }
 
-const D2 = [1.4, 2.6] as const
-const D1 = [3.1, 4.1] as const
-
-function ctrl(t: number) {
-  const d2 = seg(t, D2[0], D2[1], easeInOutSine)
-  const d1 = seg(t, D1[0], D1[1], easeInOutSine)
-  return {
-    x1: lerp(0.65, 0.82, d1),
-    y1: lerp(0, -0.36, d1),
-    x2: lerp(0.35, 0.14, d2),
-    y2: lerp(1, 1.34, d2),
-  }
-}
-
-const X = (G: Box, nx: number) => G.x + nx * G.w
-const Y = (G: Box, ny: number) => G.y + G.h - ny * G.h
-
-function curveFn(G: Box, c: ReturnType<typeof ctrl>): PathFn {
-  return (s, o) => {
-    o.x = bez(X(G, 0), X(G, c.x1), X(G, c.x2), X(G, 1), s)
-    o.y = bez(Y(G, 0), Y(G, c.y1), Y(G, c.y2), Y(G, 1), s)
-  }
-}
-
-/* ---- golden rectangle: squares, dividers and the quarter-arc spiral ---- */
-
-interface Arc {
-  cx: number
-  cy: number
-  r: number
-  a0: number
-}
-type Seg4 = [number, number, number, number]
-
-function goldenParts(B: Box) {
-  let { x, y, w, h } = B
-  const arcs: Arc[] = []
-  const divs: Seg4[] = []
-  let a = Math.PI
-  for (let i = 0; i < 9; i++) {
-    const d = i % 4
-    if (d === 0) {
-      arcs.push({ cx: x + h, cy: y + h, r: h, a0: a })
-      divs.push([x + h, y, x + h, y + h])
-      x += h
-      w -= h
-    } else if (d === 1) {
-      arcs.push({ cx: x, cy: y + w, r: w, a0: a })
-      divs.push([x, y + w, x + w, y + w])
-      y += w
-      h -= w
-    } else if (d === 2) {
-      arcs.push({ cx: x + w - h, cy: y, r: h, a0: a })
-      divs.push([x + w - h, y, x + w - h, y + h])
-      w -= h
-    } else {
-      arcs.push({ cx: x + w, cy: y + h - w, r: w, a0: a })
-      divs.push([x, y + h - w, x + w, y + h - w])
-      h -= w
-    }
-    a += Math.PI / 2
-  }
-  return { arcs, divs }
-}
-
-const spiral = makePts()
-const tmp = makePts()
-let spiralKey = ''
-let parts: ReturnType<typeof goldenParts> | null = null
-
-function goldenFor(L: Layout) {
-  const B = L.golden
-  const key = `${B.x}|${B.y}|${B.w}`
-  if (key !== spiralKey || !parts) {
-    spiralKey = key
-    parts = goldenParts(B)
-    const arcs = parts.arcs
-    resample((s, o) => {
-      const f = s * arcs.length
-      const i = Math.min(arcs.length - 1, Math.floor(f))
-      const A = arcs[i]
-      const ang = A.a0 + (f - i) * (Math.PI / 2)
-      o.x = A.cx + A.r * Math.cos(ang)
-      o.y = A.cy + A.r * Math.sin(ang)
-    }, spiral)
-  }
-  return parts
-}
-
-/* ---- cursor choreography ---- */
-
-function arcLerp(ax: number, ay: number, bx: number, by: number, p: number, bend: number) {
-  const dx = bx - ax
-  const dy = by - ay
-  const len = Math.hypot(dx, dy) || 1
-  const b = Math.sin(Math.PI * p) * bend
-  return { x: lerp(ax, bx, p) + (-dy / len) * b, y: lerp(ay, by, p) + (dx / len) * b }
-}
-
-function cursorAt(t: number, env: SceneEnv) {
-  const G = env.L.design
-  const portrait = env.f.portrait
-  const sx = G.x + G.w + (portrait ? 40 : 280)
-  const sy = G.y + G.h + (portrait ? 230 : 160)
-  const ex = G.x + G.w + (portrait ? 30 : 220)
-  const ey = G.y + G.h + (portrait ? 260 : 250)
-  const c = ctrl(t)
-  let p: { x: number; y: number }
-  if (t < D2[0]) p = arcLerp(sx, sy, X(G, 0.35), Y(G, 1), seg(t, 0.6, D2[0], easeInOutCubic), 70)
-  else if (t < D2[1]) p = { x: X(G, c.x2), y: Y(G, c.y2) }
-  else if (t < D1[0]) p = arcLerp(X(G, 0.14), Y(G, 1.34), X(G, 0.65), Y(G, 0), seg(t, D2[1], D1[0], easeInOutCubic), -90)
-  else if (t < D1[1]) p = { x: X(G, c.x1), y: Y(G, c.y1) }
-  else p = arcLerp(X(G, 0.82), Y(G, -0.36), ex, ey, seg(t, D1[1], 4.9, easeInOutCubic), 50)
-  const pressed = (t >= D2[0] && t < D2[1]) || (t >= D1[0] && t < D1[1])
-  return { ...p, a: seg(t, 0.55, 0.85) * (1 - seg(t, 4.5, 4.9)), pressed }
-}
-
-const CURSOR = [0, 0, 0, 17, 4.5, 13, 7.5, 19.5, 10.2, 18.3, 7.3, 12, 12.5, 12]
-
-function drawCursor(g: CanvasRenderingContext2D, x: number, y: number, s: number, a: number) {
-  const path = (ox: number, oy: number) => {
+function shapePath(g: CanvasRenderingContext2D, kind: number, x: number, y: number, r: number, rot: number) {
+  if (kind === 0) {
     g.beginPath()
-    for (let i = 0; i < CURSOR.length; i += 2) {
-      const px = x + ox + CURSOR[i] * s
-      const py = y + oy + CURSOR[i + 1] * s
-      if (i === 0) g.moveTo(px, py)
-      else g.lineTo(px, py)
-    }
-    g.closePath()
-  }
-  path(1.2 * s, 2 * s)
-  g.fillStyle = `rgba(0,0,0,${0.4 * a})`
-  g.fill()
-  path(0, 0)
-  g.fillStyle = `rgba(255,255,255,${a})`
-  g.fill()
-  g.lineWidth = s
-  g.strokeStyle = `rgba(10,10,12,${0.9 * a})`
-  g.stroke()
+    g.arc(x, y, r, 0, TAU)
+  } else if (kind === 4) {
+    polyPath(g, x, y, r * 1.18, 4, rot + Math.PI / 4)
+  } else polyPath(g, x, y, r * (kind === 3 ? 1.2 : 1.08), kind, rot)
 }
-
-/** Draw [text, color] runs left to right. */
-function runs(g: CanvasRenderingContext2D, x: number, y: number, parts: [string, string][]) {
-  let cx = x
-  for (const [text, color] of parts) {
-    g.fillStyle = color
-    g.fillText(text, cx, y)
-    cx += g.measureText(text).width
-  }
-}
-
-const fmt = (v: number) => (v < 0 ? '−' : '') + Math.abs(v).toFixed(2)
 
 export const designScene: Scene = {
-  line(t, env, out) {
-    const { L, f } = env
-    const G = L.design
-    const curve = curveFn(G, ctrl(t))
-    if (t < DESIGN_EVENTS.morph[0]) {
-      resample(curve, out)
-      return style(1, 0, 0)
-    }
-    goldenFor(L)
-    if (t < DESIGN_EVENTS.unfurl[0]) {
-      resample(curve, tmp)
-      blend(tmp, spiral, seg(t, DESIGN_EVENTS.morph[0], DESIGN_EVENTS.morph[1], easeInOutCubic), out, 0.55)
-      return style(1, 0, 0)
-    }
-    const k = seg(t, DESIGN_EVENTS.unfurl[0], DESIGN_EVENTS.unfurl[1], easeInOutCubic)
-    uncurl(spiral, k, 0, f.visL - 20, L.groundY, f.visR - f.visL + 40, out)
-    // edge fades assume a roughly straight line — only apply once it is one
-    return style(1, 0, 0.08 * seg(k, 0.8, 1))
+  id: 'design',
+
+  fx(t, _env, fx) {
+    const lb = t / B
+    if (lb < -0.2 || lb > 8.2) return
+    fx.flash += hits(lb, [0], 0.35, 14) + hits(lb, [4], 0.25, 14) + hits(lb, [7.95], 0.6, 20)
+    fx.shake += hits(lb, DESIGN_SNAP_BEATS, 4, 14) + hits(lb, [4], 9, 10) + hits(lb, [6.5], 12, 8)
+    fx.zoom *= 1 + hits(lb, [4], 0.04, 9) + hits(lb, DESIGN_SNAP_BEATS, 0.012, 12)
+    fx.glitch += (lb >= 5 && lb < 5.08 ? 0.9 : 0) + (lb >= 5.5 && lb < 5.58 ? 0.9 : 0) + (lb >= 6 && lb < 6.08 ? 0.6 : 0)
   },
 
-  back(g, t, env) {
-    const a = win(t, -0.4, 0.8, 6.6, 7.6) * 0.13
-    if (a < 0.003) return
-    const { f, px } = env
-    const sp = f.portrait ? 32 : 36
-    const s = 1.4 * px
-    g.fillStyle = `rgba(255,255,255,${a})`
-    g.beginPath()
-    for (let x = Math.floor(f.visL / sp) * sp; x < f.visR; x += sp) {
-      for (let y = Math.floor(f.visT / sp) * sp; y < f.visB; y += sp) g.rect(x - s / 2, y - s / 2, s, s)
+  draw(g, t, env) {
+    const lb = t / B
+    if (lb < 0 || lb >= 8) return
+    const { U, cx, cy } = env
+    const G = geom(env)
+    const sx = env.portrait ? 0.62 : 1
+    const P = (x: number, y: number): [number, number] => [cx + x * U, cy + y * U]
+    const blast = seg(lb, 6.5, 7.2, easeInCubic)
+    const out = (x: number, y: number, i: number): [number, number] => {
+      // everything but the hexagon flies outward on the blast
+      if (blast <= 0) return [x, y]
+      const a = Math.atan2(y - cy, x - cx) + (hash(i) - 0.5) * 0.6
+      const d = blast * 1400 * U
+      return [x + Math.cos(a) * d, y + Math.sin(a) * d]
     }
-    g.fill()
-  },
+    const fadeB = 1 - blast
 
-  front(g, t, env) {
-    if (t < -0.3 || t > 8.4) return
-    const { L, px, f } = env
-    const G = L.design
-    const c = ctrl(t)
-    const fadeOut = 1 - seg(t, 4.9, 5.4)
+    titleCard(g, env, lb, 'DESIGN', NEON.cyan)
 
-    const p0x = X(G, 0)
-    const p0y = Y(G, 0)
-    const p3x = X(G, 1)
-    const p3y = Y(G, 1)
-    const k1x = X(G, c.x1)
-    const k1y = Y(G, c.y1)
-    const k2x = X(G, c.x2)
-    const k2y = Y(G, c.y2)
-    const drag2 = t >= D2[0] && t < D2[1]
-    const drag1 = t >= D1[0] && t < D1[1]
-
-    // --- handles & anchors --------------------------------------------------
-    if (fadeOut > 0 && t > 0) {
-      const grow = t > 0.35 ? easeOutBack(clamp((t - 0.35) / 0.5)) : 0
-      g.lineWidth = px
-      g.strokeStyle = `rgba(255,255,255,${0.55 * fadeOut})`
-      g.beginPath()
-      g.moveTo(p0x, p0y)
-      g.lineTo(lerp(p0x, k1x, grow), lerp(p0y, k1y, grow))
-      g.moveTo(p3x, p3y)
-      g.lineTo(lerp(p3x, k2x, grow), lerp(p3y, k2y, grow))
-      g.stroke()
-
-      const knob = (x: number, y: number, active: boolean, near: number) => {
-        const r = 4 * px * clamp(grow * 1.4, 0, 1.15)
-        if (r <= 0) return
-        if (active || near > 0) {
-          g.fillStyle = rgba(CORAL, (active ? 0.28 : 0.18 * near) * fadeOut)
-          g.beginPath()
-          g.arc(x, y, (active ? 11 : 8 + 3 * near) * px, 0, Math.PI * 2)
-          g.fill()
-        }
-        g.fillStyle = active ? rgba(CORAL, fadeOut) : `rgba(255,255,255,${fadeOut})`
+    // --- the pen swoosh ------------------------------------------------------------
+    const pen = seg(lb, 0, 1.45, easeInOutCubic) * 3
+    const swA = (1 - seg(lb, 2.6, 3.6)) * fadeB
+    if (swA > 0.003 && pen > 0) {
+      const pts: [number, number][] = []
+      const N = 150
+      for (let i = 0; i <= N; i++) {
+        const s = (i / N) * pen
+        const k = Math.min(2, Math.floor(s))
+        const f = s - k
+        const c = SWOOSH[k]
+        pts.push(P(bez(c[0][0], c[1][0], c[2][0], c[3][0], f) * sx, bez(c[0][1], c[1][1], c[2][1], c[3][1], f)))
+      }
+      const grad = g.createLinearGradient(cx - 600 * U, 0, cx + 600 * U, 0)
+      grad.addColorStop(0, NEON.mint)
+      grad.addColorStop(1, NEON.cyan)
+      g.lineCap = 'round'
+      g.lineJoin = 'round'
+      for (const [w, a, s] of [
+        [10, 0.25, grad],
+        [3.5, 1, grad],
+        [1.2, 0.9, NEON.white],
+      ] as const) {
+        g.strokeStyle = s
+        g.globalAlpha = a * swA
+        g.lineWidth = w * Math.max(0.6, U * 1.4)
         g.beginPath()
-        g.arc(x, y, r, 0, Math.PI * 2)
+        pts.forEach(([x, y], i) => (i ? g.lineTo(x, y) : g.moveTo(x, y)))
+        g.stroke()
+      }
+      g.globalAlpha = 1
+      // anchors + handles appear as the pen passes each one
+      SWOOSH.forEach((c, k) => {
+        const reached = clamp((pen - k) * 4)
+        if (reached <= 0) return
+        const [ax, ay] = P(c[0][0] * sx, c[0][1])
+        const [hx, hy] = P(c[1][0] * sx, c[1][1])
+        const hl = easeOutCubic(reached)
+        g.strokeStyle = col(NEON.white, 0.55 * swA)
+        g.lineWidth = 1
+        g.beginPath()
+        g.moveTo(ax, ay)
+        g.lineTo(lerp(ax, hx, hl), lerp(ay, hy, hl))
+        g.stroke()
+        g.fillStyle = col(NEON.white, swA)
+        g.beginPath()
+        g.arc(lerp(ax, hx, hl), lerp(ay, hy, hl), 4, 0, TAU)
         g.fill()
+        const s = 10 * springOut((pen - k) * 0.4, 3, 0.4)
+        g.fillStyle = col('#05080D', swA)
+        g.fillRect(ax - s / 2, ay - s / 2, s, s)
+        g.strokeStyle = col(NEON.cyan, swA)
+        g.lineWidth = 1.5
+        g.strokeRect(ax - s / 2, ay - s / 2, s, s)
+      })
+      if (pen < 3) {
+        const [x, y] = pts[pts.length - 1]
+        glow(g, x, y, 60 * U, NEON.white, 0.8)
       }
-      knob(lerp(p0x, k1x, grow), lerp(p0y, k1y, grow), drag1, win(t, 2.8, 3.1, 3.1, 3.2))
-      knob(lerp(p3x, k2x, grow), lerp(p3y, k2y, grow), drag2, win(t, 1.1, 1.4, 1.4, 1.5))
-
-      const anchor = (x: number, y: number, at: number, active: boolean) => {
-        const s = 9 * px * springOut(t - at)
-        if (s <= 0) return
-        g.fillStyle = active ? rgba(CORAL, fadeOut) : `rgba(11,11,14,${fadeOut})`
-        g.fillRect(x - s / 2, y - s / 2, s, s)
-        g.strokeStyle = `rgba(255,255,255,${0.95 * fadeOut})`
-        g.lineWidth = 1.25 * px
-        g.strokeRect(x - s / 2, y - s / 2, s, s)
-      }
-      anchor(p0x, p0y, DESIGN_EVENTS.anchors[0], drag1)
-      anchor(p3x, p3y, DESIGN_EVENTS.anchors[1], drag2)
     }
 
-    // --- properties panel ---------------------------------------------------
-    const pa = win(t, 0.4, 0.9, 4.9, 5.3)
-    if (pa > 0.003) {
-      const slide = (1 - seg(t, 0.4, 1.0, easeOutCubic)) * 16 * px
-      const hi1 = drag1 ? rgba(CORAL, pa) : `rgba(255,255,255,${0.85 * pa})`
-      const hi2 = drag2 ? rgba(CORAL, pa) : `rgba(255,255,255,${0.85 * pa})`
-      const dimc = `rgba(255,255,255,${0.4 * pa})`
-      g.textBaseline = 'middle'
-      g.textAlign = 'left'
-      if (f.portrait) {
-        g.font = uiFont(env, 11)
-        const text = `cubic-bezier(${fmt(c.x1)}, ${fmt(c.y1)}, ${fmt(c.x2)}, ${fmt(c.y2)})`
-        const w = g.measureText(text).width
-        const x = f.w / 2 - w / 2
-        runs(g, x, L.panel.y + slide, [
-          ['cubic-bezier(', dimc],
-          [`${fmt(c.x1)}, ${fmt(c.y1)}`, hi1],
-          [', ', dimc],
-          [`${fmt(c.x2)}, ${fmt(c.y2)}`, hi2],
-          [')', dimc],
-        ])
+    // --- modular grid --------------------------------------------------------------
+    const gridP = seg(lb, 1.5, 2.05, easeOutExpo)
+    const gridA = gridP * (1 - seg(lb, 6.3, 6.8)) * 0.35
+    if (gridA > 0.003) {
+      g.strokeStyle = col(NEON.cyan, gridA)
+      g.lineWidth = 1
+      const gx = (G.grid.x0 + G.grid.x1) / 2
+      const gy = (G.grid.y0 + G.grid.y1) / 2
+      g.beginPath()
+      for (let c = 0; c <= G.cols; c++) {
+        const x = G.grid.x0 + c * G.cw
+        const [px, py0] = P(x, gy - ((G.grid.y1 - G.grid.y0) / 2 + 60) * gridP)
+        const [, py1] = P(x, gy + ((G.grid.y1 - G.grid.y0) / 2 + 60) * gridP)
+        g.moveTo(px, py0)
+        g.lineTo(px, py1)
+      }
+      for (let r = 0; r <= G.rows; r++) {
+        const y = G.grid.y0 + r * G.ch
+        const [px0, py] = P(gx - ((G.grid.x1 - G.grid.x0) / 2 + 60) * gridP, y)
+        const [px1] = P(gx + ((G.grid.x1 - G.grid.x0) / 2 + 60) * gridP, y)
+        g.moveTo(px0, py)
+        g.lineTo(px1, py)
+      }
+      g.stroke()
+    }
+
+    // --- shapes snap into the grid ---------------------------------------------------
+    const beat4 = springOut(t - 4 * B, 2.6, 0.4)
+    SHAPES.forEach((sh, i) => {
+      const p = springOut(t - sh.at * B, 3, 0.42)
+      if (p <= 0) return
+      const isHex = sh.kind === 6
+      let [x, y] = P(G.grid.x0 + (sh.cell[0] + 0.5) * G.cw, G.grid.y0 + (sh.cell[1] + 0.5) * G.ch)
+      let r = G.r * U * p
+      let rot = (1 - clamp(p)) * 1.6 + beat4 * (Math.PI / 2) * (isHex ? 1 / 3 : 1)
+      let a = 1
+      if (isHex) {
+        // the hexagon survives the blast, heads for centre and flies through the lens
+        const home = seg(lb, 6.6, 7.35, easeInOutCubic)
+        x = lerp(x, cx, home)
+        y = lerp(y, cy, home)
+        const zoom = Math.pow(seg(lb, 7.3, 8, easeInCubic), 2.2)
+        r *= 1 + zoom * 40
+        rot += zoom * 0.6
       } else {
-        const x = L.panel.x + slide
-        const y = L.panel.y
-        const w = 204 * px
-        const h = 156 * px
-        roundRect(g, x, y, w, h, 10 * px)
-        g.fillStyle = `rgba(255,255,255,${0.035 * pa})`
-        g.fill()
-        g.strokeStyle = `rgba(255,255,255,${0.1 * pa})`
-        g.lineWidth = px
-        g.stroke()
-
-        g.font = uiFont(env, 11, 500, SANS)
-        g.fillStyle = rgba(CORAL, pa)
-        g.beginPath()
-        g.arc(x + 17 * px, y + 22 * px, 3 * px, 0, Math.PI * 2)
-        g.fill()
-        g.fillStyle = `rgba(255,255,255,${0.6 * pa})`
-        setSpacing(g, '0.04em')
-        g.fillText('Easing', x + 27 * px, y + 22 * px)
-        setSpacing(g, '0px')
-
-        g.font = uiFont(env, 12)
-        g.fillStyle = `rgba(255,255,255,${0.9 * pa})`
-        g.fillText('cubic-bezier', x + 16 * px, y + 50 * px)
-        g.font = uiFont(env, 11)
-        const col2 = x + 108 * px
-        runs(g, x + 16 * px, y + 76 * px, [['x1  ', dimc], [fmt(c.x1), hi1]])
-        runs(g, col2, y + 76 * px, [['y1  ', dimc], [fmt(c.y1), hi1]])
-        runs(g, x + 16 * px, y + 98 * px, [['x2  ', dimc], [fmt(c.x2), hi2]])
-        runs(g, col2, y + 98 * px, [['y2  ', dimc], [fmt(c.y2), hi2]])
-
-        // live preview of the easing being edited
-        const tx0 = x + 16 * px
-        const tx1 = x + w - 16 * px
-        const ty = y + 130 * px
-        g.strokeStyle = `rgba(255,255,255,${0.12 * pa})`
-        g.beginPath()
-        g.moveTo(tx0, ty)
-        g.lineTo(tx1, ty)
-        g.stroke()
-        const cyc = ((env.time % 1.6) + 1.6) % 1.6
-        const e = cubicBezierEase(c.x1, c.y1, c.x2, c.y2, clamp(cyc / 1.2))
-        g.fillStyle = rgba(CORAL, pa)
-        g.beginPath()
-        g.arc(lerp(tx0, tx1, e), ty, 4 * px, 0, Math.PI * 2)
-        g.fill()
+        ;[x, y] = out(x, y, i)
+        rot += blast * 4
+        a = fadeB
       }
-    }
-
-    // --- bounding box + smart guides ----------------------------------------
-    const ba = win(t, DESIGN_EVENTS.bbox, DESIGN_EVENTS.bbox + 0.25, 5.0, 5.35)
-    if (ba > 0.003) {
-      let x0 = Infinity
-      let y0 = Infinity
-      let x1 = -Infinity
-      let y1 = -Infinity
-      for (let i = 0; i <= 64; i++) {
-        const s = i / 64
-        const x = bez(p0x, k1x, k2x, p3x, s)
-        const y = bez(p0y, k1y, k2y, p3y, s)
-        x0 = Math.min(x0, x)
-        x1 = Math.max(x1, x)
-        y0 = Math.min(y0, y)
-        y1 = Math.max(y1, y)
-      }
-      const grow = lerp(0.96, 1, easeOutCubic(clamp((t - DESIGN_EVENTS.bbox) / 0.3)))
-      const cx = (x0 + x1) / 2
-      const cy = (y0 + y1) / 2
-      const hw = ((x1 - x0) / 2) * grow
-      const hh = ((y1 - y0) / 2) * grow
-
-      const ga = win(t, 4.3, 4.4, 4.8, 4.95)
-      if (ga > 0) {
-        g.strokeStyle = rgba(GUIDE, 0.6 * ga)
-        g.lineWidth = px
-        g.beginPath()
-        g.moveTo(cx, f.visT)
-        g.lineTo(cx, f.visB)
-        g.moveTo(f.visL, cy)
-        g.lineTo(f.visR, cy)
-        g.stroke()
-      }
-
-      g.strokeStyle = rgba(CORAL, ba)
-      g.lineWidth = px
-      g.strokeRect(cx - hw, cy - hh, hw * 2, hh * 2)
-      const hs = 6 * px
-      for (const [hx, hy] of [
-        [-1, -1],
-        [0, -1],
-        [1, -1],
-        [1, 0],
-        [1, 1],
-        [0, 1],
-        [-1, 1],
-        [-1, 0],
-      ]) {
-        const x = cx + hx * hw
-        const y = cy + hy * hh
-        g.fillStyle = `rgba(255,255,255,${ba})`
-        g.fillRect(x - hs / 2, y - hs / 2, hs, hs)
-        g.strokeRect(x - hs / 2, y - hs / 2, hs, hs)
-      }
-      g.font = uiFont(env, 10.5, 500)
-      const label = `${Math.round(x1 - x0)} × ${Math.round(y1 - y0)}`
-      const lw = g.measureText(label).width + 14 * px
-      roundRect(g, cx - lw / 2, cy + hh + 10 * px, lw, 19 * px, 4 * px)
-      g.fillStyle = rgba(CORAL, ba)
+      const swatch = lb >= DESIGN_SWATCH_BEATS[i] ? SWATCHES[i] : NEON.cyan
+      g.globalAlpha = a
+      shapePath(g, sh.kind, x, y, r, rot)
+      g.fillStyle = col(swatch, 0.14)
       g.fill()
-      g.fillStyle = `rgba(26,10,6,${ba})`
-      g.textAlign = 'center'
-      g.textBaseline = 'middle'
-      g.fillText(label, cx, cy + hh + 19.5 * px)
-      g.textAlign = 'left'
-    }
-
-    // --- golden-ratio construction -------------------------------------------
-    const gA = seg(t, DESIGN_EVENTS.golden, DESIGN_EVENTS.golden + 0.3) * (1 - seg(t, 6.8, 7.3))
-    if (gA > 0.003) {
-      const B = L.golden
-      const { divs } = goldenFor(L)
-      g.strokeStyle = `rgba(255,255,255,${0.2 * gA})`
-      g.lineWidth = px
-      g.beginPath()
-      const per = seg(t, DESIGN_EVENTS.golden, DESIGN_EVENTS.golden + 0.5, easeInOutCubic) * 4
-      const edges: Seg4[] = [
-        [B.x, B.y + B.h, B.x, B.y],
-        [B.x, B.y, B.x + B.w, B.y],
-        [B.x + B.w, B.y, B.x + B.w, B.y + B.h],
-        [B.x + B.w, B.y + B.h, B.x, B.y + B.h],
-      ]
-      edges.forEach(([ax, ay, bx, by], i) => {
-        const p = clamp(per - i)
-        if (p <= 0) return
-        g.moveTo(ax, ay)
-        g.lineTo(lerp(ax, bx, p), lerp(ay, by, p))
-      })
-      divs.slice(0, 8).forEach(([ax, ay, bx, by], i) => {
-        const a0 = DESIGN_EVENTS.goldenLines + i * 0.125
-        const p = seg(t, a0, a0 + 0.3, easeOutCubic)
-        if (p <= 0) return
-        g.moveTo(ax, ay)
-        g.lineTo(lerp(ax, bx, p), lerp(ay, by, p))
-      })
+      g.strokeStyle = swatch
+      g.lineWidth = isHex && lb > 7.3 ? 4 : 2.5
       g.stroke()
+      g.globalAlpha = 1
 
-      const la = win(t, 5.5, 5.9, 6.7, 7.1)
-      if (la > 0) {
-        g.font = uiFont(env, 10.5)
-        g.textAlign = 'right'
-        g.textBaseline = 'middle'
-        g.fillStyle = `rgba(255,255,255,${0.4 * la})`
-        g.fillText('1 : 1.618', B.x + B.w, B.y + B.h + 18 * px)
-        g.textAlign = 'left'
+      // bounding box + dimension on snap
+      const bb = clamp((lb - sh.at) / 0.1) * (1 - clamp((lb - sh.at - 0.55) / 0.3)) * fadeB
+      if (bb > 0.003 && !(isHex && lb > 6.6)) {
+        const s = G.r * U * 1.3
+        g.strokeStyle = col(NEON.white, 0.8 * bb)
+        g.lineWidth = 1
+        g.strokeRect(x - s, y - s, s * 2, s * 2)
+        g.fillStyle = col(NEON.white, bb)
+        for (const [hx, hy] of [[-1, -1], [1, -1], [1, 1], [-1, 1]])
+          g.fillRect(x + hx * s - 3, y + hy * s - 3, 6, 6)
+        g.font = font(10, 500, MONO)
+        g.textAlign = 'center'
+        g.fillStyle = col(NEON.cyan, bb)
+        g.fillText(`${Math.round(G.r * 2.6)} × ${Math.round(G.r * 2.6)}`, x, y + s + 16)
+        // smart guide to the previous shape
+        if (i > 0) {
+          const prev = SHAPES[i - 1]
+          const [px, py] = P(G.grid.x0 + (prev.cell[0] + 0.5) * G.cw, G.grid.y0 + (prev.cell[1] + 0.5) * G.ch)
+          g.strokeStyle = col(NEON.lime, 0.9 * bb)
+          g.setLineDash([4, 4])
+          g.beginPath()
+          g.moveTo(px, py)
+          g.lineTo(x, y)
+          g.stroke()
+          g.setLineDash([])
+        }
       }
+      burst(g, x, y, t - sh.at * B - 0.08, { n: 12, seed: i + 40, speed: 420 * U, life: 0.45, size: 3, color: swatch, kind: 'streak' })
+    })
+
+    // --- type specimen: slams in, cycles faces ---------------------------------------
+    const spP = springOut(t - 4 * B, 2.8, 0.45)
+    const spA = spP > 0 ? clamp(spP * 3) * fadeB : 0
+    if (spA > 0.003) {
+      const face = FACES[lb < 5 ? 0 : lb < 5.5 ? 1 : lb < 6 ? 2 : 3]
+      let [x, y] = P(G.spec.x, G.spec.y)
+      ;[x, y] = out(x, y, 9)
+      const size = (env.portrait ? 300 : 400) * U
+      const base = y + size * 0.3
+      const s = lerp(1.5, 1, clamp(spP))
+      // metric lines
+      const lines = [
+        ['ascender', 0.8],
+        ['cap height', 0.7],
+        ['x-height', 0.47],
+        ['baseline', 0],
+        ['descender', -0.22],
+      ] as const
+      const lp = seg(lb, 4.2, 4.8, easeOutExpo)
+      g.font = font(10, 500, MONO)
+      g.textAlign = 'left'
+      g.textBaseline = 'middle'
+      lines.forEach(([label, k], i) => {
+        const ly = base - k * size
+        const w = (env.portrait ? 380 : 330) * U
+        const pi = clamp(lp * 1.6 - i * 0.15)
+        g.fillStyle = col(i === 3 ? NEON.mint : NEON.cyan, (i === 3 ? 0.9 : 0.4) * spA)
+        g.fillRect(x - w, ly, w * 2 * pi, 1)
+        g.fillStyle = col(NEON.white, 0.55 * spA * pi)
+        g.textAlign = 'right'
+        g.fillText(label, x + w, ly - 8)
+      })
+      g.save()
+      g.translate(x, base)
+      g.scale(s, s)
+      g.globalAlpha = spA
+      g.font = font(size, face.weight, face.family, face.style)
+      g.textAlign = 'center'
+      g.textBaseline = 'alphabetic'
+      const grad = g.createLinearGradient(0, -size * 0.8, 0, 0)
+      grad.addColorStop(0, NEON.white)
+      grad.addColorStop(1, NEON.cyan)
+      g.fillStyle = grad
+      g.fillText('Aa', 0, 0)
+      g.restore()
+      g.globalAlpha = spA
+      g.font = font(11, 500, MONO)
+      g.textAlign = 'center'
+      g.fillStyle = NEON.mint
+      g.fillText(face.name.toUpperCase(), x, base + size * 0.36)
+      g.globalAlpha = 1
     }
 
-    // --- the cursor, on top of everything -------------------------------------
-    const cur = cursorAt(t, env)
-    if (cur.a > 0.003) {
-      const s = px * (cur.pressed ? 0.9 : 1)
-      drawCursor(g, cur.x, cur.y, s, cur.a)
+    // --- palette ------------------------------------------------------------------------
+    SWATCHES.forEach((c, i) => {
+      const p = springOut(t - DESIGN_SWATCH_BEATS[i] * B, 3, 0.4)
+      if (p <= 0) return
+      let [x, y] = P(G.swatchX + (i - 2) * (env.portrait ? 120 : 92), G.swatchY)
+      ;[x, y] = out(x, y, i + 20)
+      const r = 26 * U * p
+      g.globalAlpha = fadeB
+      g.fillStyle = c
+      g.beginPath()
+      g.arc(x, y, Math.max(0, r), 0, TAU)
+      g.fill()
+      g.font = font(9, 500, MONO)
+      g.textAlign = 'center'
+      g.fillStyle = col(NEON.white, 0.6 * clamp(p))
+      g.fillText(c.toUpperCase(), x, y + r + 14)
+      g.globalAlpha = 1
+    })
+
+    // --- the lens: hexagon interior becomes the floor ------------------------------------
+    const zoom = seg(lb, 7.55, 8)
+    if (zoom > 0) {
+      g.fillStyle = col('#07131A', zoom)
+      g.fillRect(0, 0, env.W, env.H)
     }
   },
 
-  debug(g, t, env) {
-    const G = env.L.design
-    const c = ctrl(t)
-    g.setLineDash([4 * env.px, 4 * env.px])
-    g.strokeStyle = rgba(WHITE, 0.5)
-    g.lineWidth = env.px
-    g.beginPath()
-    g.moveTo(X(G, 0), Y(G, 0))
-    g.lineTo(X(G, c.x1), Y(G, c.y1))
-    g.lineTo(X(G, c.x2), Y(G, c.y2))
-    g.lineTo(X(G, 1), Y(G, 1))
-    g.stroke()
-    g.setLineDash([])
-    g.font = `${11 * env.px}px ${MONO}`
-    g.fillStyle = rgba(WHITE, 0.7)
-    g.fillText(`P1 (${c.x1.toFixed(2)}, ${c.y1.toFixed(2)})  P2 (${c.x2.toFixed(2)}, ${c.y2.toFixed(2)})`, G.x, G.y + G.h + 40 * env.px)
+  hud(g, t, env) {
+    slate(g, env, t / B, '02', 'Design', NEON.cyan)
   },
 }

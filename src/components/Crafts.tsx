@@ -7,14 +7,18 @@ import Reveal, { Lines } from './Reveal'
  * offscreen and never start for reduced-motion visitors.
  */
 
+/* neon inside the dark vignettes, earth tones on the page */
 const C = {
-  code: '#7C9DFF',
-  design: '#FF6B4A',
-  game: '#3FE0A0',
-  music: '#FFC24D',
-  text: '#E8E6E0',
-  dim: '#5E6372',
+  code: '#5CA8FF',
+  design: '#3DE3F5',
+  game: '#3DFFA8',
+  music: '#B8FF5C',
+  text: '#E6F0EE',
+  dim: '#566872',
+  hot: '#FF4F8B',
+  violet: '#8B7CFF',
 }
+const EARTH = { code: '#2B6A93', design: '#1F8A86', game: '#3F7A55', music: '#6F952F' }
 
 function useSmil() {
   const ref = useRef<SVGSVGElement>(null)
@@ -129,7 +133,7 @@ function DesignVisual() {
       <path d={pathAt(0)} fill="none" stroke={C.design} strokeOpacity="0.2" strokeWidth="9" strokeLinecap="round">
         <Smil attr="d" values={D_VALUES} />
       </path>
-      <path d={pathAt(0)} fill="none" stroke="#FFD9CF" strokeWidth="2" strokeLinecap="round">
+      <path d={pathAt(0)} fill="none" stroke="#D8FBFF" strokeWidth="2" strokeLinecap="round">
         <Smil attr="d" values={D_VALUES} />
       </path>
       <g stroke="rgba(255,255,255,0.5)" strokeWidth="1">
@@ -170,73 +174,76 @@ function DesignVisual() {
   )
 }
 
-/* ---- 03 game design: a hero hopping spikes on a scrolling level ---- */
+/* ---- 03 game dev: a top-down spin slash clearing a ring of enemies ---- */
 
-const GROUND = (() => {
-  let d = 'M-200 160'
-  for (let x = -118; x < 760; x += 160) d += ` L${x - 15} 160 L${x} 138 L${x + 15} 160`
-  return `${d} L780 160`
-})()
-const HILLS = (() => {
-  let d = 'M-340 130'
-  for (let x = -340; x < 700; x += 20) d += ` L${x} ${130 - 18 * (0.5 + 0.5 * Math.sin((x / 320) * Math.PI * 2))}`
-  return d
-})()
+const ARENA = { x: 160, y: 112 }
+const FOES = Array.from({ length: 7 }, (_, k) => {
+  const a = (k / 7) * Math.PI * 2 + 0.3
+  return { a, x0: ARENA.x + Math.cos(a) * 118, y0: ARENA.y + Math.sin(a) * 86, x1: ARENA.x + Math.cos(a) * 34, y1: ARENA.y + Math.sin(a) * 30 }
+})
 
 function GameVisual() {
   const ref = useSmil()
+  const dur = '2.4s'
   return (
     <svg ref={ref} viewBox="0 0 320 220" aria-hidden="true">
-      {[
-        [40, 40], [96, 26], [150, 52], [212, 30], [268, 48], [296, 20], [20, 76], [240, 80],
-      ].map(([x, y], i) => (
-        <circle key={i} cx={x} cy={y} r={i % 3 ? 0.9 : 1.3} fill="#fff" opacity={0.25 + (i % 4) * 0.1} />
-      ))}
-      <g>
-        <animateTransform attributeName="transform" type="translate" from="0 0" to="-320 0" dur="6.4s" repeatCount="indefinite" />
-        <path d={HILLS} fill="none" stroke="rgba(255,255,255,0.12)" strokeWidth="1" />
-      </g>
-      <g>
-        <animateTransform attributeName="transform" type="translate" from="0 0" to="-160 0" dur="1.6s" repeatCount="indefinite" />
-        <path d={GROUND} fill="none" stroke={C.game} strokeOpacity="0.22" strokeWidth="8" strokeLinejoin="round" />
-        <path d={GROUND} fill="none" stroke="#CFFBE8" strokeWidth="2" strokeLinejoin="round" />
-        {[202, 362, 522].map((x) => (
-          <path key={x} d={`M${x} 76 L${x + 7} 86 L${x} 96 L${x - 7} 86 Z`} fill={C.music}>
-            {x === 202 && <animate attributeName="opacity" values="1;1;0;0" keyTimes="0;0.49;0.5;1" dur="1.6s" repeatCount="indefinite" />}
-          </path>
-        ))}
-      </g>
-      <circle cx="122" cy="86" r="4" fill="none" stroke={C.music} strokeWidth="1.5" opacity="0">
-        <animate attributeName="r" values="4;4;22;22" keyTimes="0;0.5;0.75;1" dur="1.6s" repeatCount="indefinite" />
-        <animate attributeName="opacity" values="0;0;0.9;0;0" keyTimes="0;0.49;0.5;0.75;1" dur="1.6s" repeatCount="indefinite" />
-      </circle>
-      <g transform="translate(122 160)">
-        <g>
-          <animateTransform
-            attributeName="transform"
-            type="translate"
-            values="0 0;0 0;0 -64;0 0;0 0"
-            keyTimes="0;0.3;0.5;0.7;1"
-            calcMode="spline"
-            keySplines="0 0 1 1;0.2 0.6 0.4 1;0.6 0 0.8 0.4;0 0 1 1"
-            dur="1.6s"
-            repeatCount="indefinite"
-          />
-          <g>
-            <animateTransform
-              attributeName="transform"
-              type="scale"
-              values="1 1;1 1;0.84 1.2;1 1;1 1;1.3 0.72;1 1;1 1"
-              keyTimes="0;0.27;0.33;0.45;0.69;0.73;0.82;1"
-              dur="1.6s"
-              repeatCount="indefinite"
-            />
-            <rect x="-12" y="-24" width="24" height="24" rx="6" fill={C.game} />
-            <rect x="1" y="-19" width="2.8" height="7" rx="1.4" fill="#04281A" />
-            <rect x="6.5" y="-19" width="2.8" height="7" rx="1.4" fill="#04281A" />
+      <defs>
+        <pattern id="hexgrid" width="24" height="41.57" patternUnits="userSpaceOnUse">
+          <path d="M8 0 L16 0 L20 6.93 L16 13.86 L8 13.86 L4 6.93 Z M20 6.93 L28 6.93 M8 13.86 L4 20.78 L8 27.71 L16 27.71 L20 20.78 L16 13.86 M4 20.78 L-4 20.78 M8 27.71 L4 34.64 L8 41.57 M16 27.71 L20 34.64 L16 41.57 M20 34.64 L28 34.64" fill="none" stroke="rgba(61,227,245,0.12)" strokeWidth="0.8" />
+        </pattern>
+        <radialGradient id="arenaFade" cx="50%" cy="50%" r="60%">
+          <stop offset="0.6" stopColor="#05080D" stopOpacity="0" />
+          <stop offset="1" stopColor="#05080D" stopOpacity="1" />
+        </radialGradient>
+      </defs>
+      <rect width="320" height="220" fill="url(#hexgrid)" />
+      <rect width="320" height="220" fill="url(#arenaFade)" />
+      <ellipse cx={ARENA.x} cy={ARENA.y} rx="120" ry="88" fill="none" stroke={C.design} strokeOpacity="0.28" strokeDasharray="4 8" />
+
+      {FOES.map((f, k) => (
+        <g key={k}>
+          <animateTransform attributeName="transform" type="translate" values={`${f.x0} ${f.y0};${f.x1} ${f.y1};${f.x1 + Math.cos(f.a) * 16} ${f.y1 + Math.sin(f.a) * 14};${f.x1} ${f.y1}`} keyTimes="0;0.55;0.62;1" dur={dur} repeatCount="indefinite" />
+          <g transform={`rotate(${(f.a * 180) / Math.PI + 90})`}>
+            <path d="M0 -9 L8 6 L-8 6 Z" fill="rgba(139,124,255,0.3)" stroke={C.violet} strokeWidth="1.5">
+              <animate attributeName="fill" values="rgba(139,124,255,0.3);rgba(139,124,255,0.3);#ffffff;rgba(139,124,255,0.3)" keyTimes="0;0.55;0.58;1" dur={dur} repeatCount="indefinite" />
+            </path>
+            <circle r="2.2" fill={C.hot} />
           </g>
+          <animate attributeName="opacity" values="0;1;1;0;0" keyTimes="0;0.08;0.6;0.64;1" dur={dur} repeatCount="indefinite" />
         </g>
+      ))}
+
+      {FOES.map((f, k) => (
+        <circle key={`s${k}`} cx={f.x1} cy={f.y1} r="3" fill="none" stroke="#ffffff" strokeWidth="1.5" opacity="0">
+          <animate attributeName="r" values="3;3;16;16" keyTimes="0;0.58;0.74;1" dur={dur} repeatCount="indefinite" />
+          <animate attributeName="opacity" values="0;0;1;0;0" keyTimes="0;0.57;0.58;0.74;1" dur={dur} repeatCount="indefinite" />
+        </circle>
+      ))}
+
+      <g opacity="0">
+        <animate attributeName="opacity" values="0;0;1;1;0;0" keyTimes="0;0.53;0.55;0.62;0.72;1" dur={dur} repeatCount="indefinite" />
+        <animateTransform attributeName="transform" type="rotate" values={`0 ${ARENA.x} ${ARENA.y};0 ${ARENA.x} ${ARENA.y};360 ${ARENA.x} ${ARENA.y};360 ${ARENA.x} ${ARENA.y}`} keyTimes="0;0.53;0.66;1" dur={dur} repeatCount="indefinite" />
+        <path d={`M${ARENA.x} ${ARENA.y - 44} A44 40 0 1 1 ${ARENA.x - 44} ${ARENA.y}`} fill="none" stroke={C.design} strokeWidth="9" strokeOpacity="0.25" strokeLinecap="round" />
+        <path d={`M${ARENA.x} ${ARENA.y - 44} A44 40 0 1 1 ${ARENA.x - 44} ${ARENA.y}`} fill="none" stroke="#ffffff" strokeWidth="3" strokeLinecap="round" />
       </g>
+
+      <circle cx={ARENA.x} cy={ARENA.y} r="22" fill={C.design} opacity="0.12" />
+      <circle cx={ARENA.x} cy={ARENA.y} r="12" fill="none" stroke={C.design} strokeWidth="2" />
+      <circle cx={ARENA.x} cy={ARENA.y} r="7" fill="#ffffff" />
+
+      {[0, 3].map((k) => (
+        <text key={`d${k}`} x={FOES[k].x1} y={FOES[k].y1 - 14} textAnchor="middle" fontFamily="Unbounded, sans-serif" fontWeight="800" fontSize={k ? 13 : 10} fill={k ? '#FFD166' : '#ffffff'} opacity="0">
+          {k ? '512' : '128'}
+          <animate attributeName="opacity" values="0;0;1;1;0" keyTimes="0;0.58;0.62;0.82;0.92" dur={dur} repeatCount="indefinite" />
+          <animateTransform attributeName="transform" type="translate" values="0 0;0 0;0 -14" keyTimes="0;0.58;0.92" dur={dur} repeatCount="indefinite" />
+        </text>
+      ))}
+
+      <rect x="16" y="16" width="64" height="4" rx="2" fill="rgba(255,255,255,0.12)" />
+      <rect x="16" y="16" width="52" height="4" rx="2" fill={C.game} />
+      <text x="304" y="24" textAnchor="end" fontFamily="Unbounded, sans-serif" fontWeight="900" fontSize="14" fill="#ffffff">
+        x7
+      </text>
     </svg>
   )
 }
@@ -289,7 +296,7 @@ function MusicVisual() {
       <path d={first} fill="none" stroke={C.music} strokeOpacity="0.22" strokeWidth="9" strokeLinecap="round" strokeLinejoin="round">
         <animate attributeName="d" values={WAVE_VALUES} dur="4s" repeatCount="indefinite" />
       </path>
-      <path d={first} fill="none" stroke="#FFF1D2" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+      <path d={first} fill="none" stroke="#EFFFE0" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
         <animate attributeName="d" values={WAVE_VALUES} dur="4s" repeatCount="indefinite" />
       </path>
       {[0, 1, 2, 3].map((i) => (
@@ -301,10 +308,11 @@ function MusicVisual() {
   )
 }
 
-const CRAFTS: { id: string; color: string; title: string; body: string; tags: string[]; visual: ReactNode }[] = [
+const CRAFTS: { id: string; color: string; glow: string; title: string; body: string; tags: string[]; visual: ReactNode }[] = [
   {
     id: 'programming',
-    color: C.code,
+    color: EARTH.code,
+    glow: C.code,
     title: 'Programming',
     body: "Production systems at enterprise scale: React front ends, C#/.NET and GraphQL services, and the CI/CD pipelines that ship them. Lately I've also been leading AI-assisted development across my org.",
     tags: ['C# / .NET', 'React', 'TypeScript', 'GraphQL', 'Azure DevOps'],
@@ -312,7 +320,8 @@ const CRAFTS: { id: string; color: string; title: string; body: string; tags: st
   },
   {
     id: 'design',
-    color: C.design,
+    color: EARTH.design,
+    glow: C.design,
     title: 'Design',
     body: 'Interfaces with intent. I tune type, spacing and motion until they feel inevitable, and I care about the systems underneath that keep them consistent. This site is built by hand, frame by frame.',
     tags: ['Interface', 'Motion', 'Typography', 'Design systems'],
@@ -320,7 +329,8 @@ const CRAFTS: { id: string; color: string; title: string; body: string; tags: st
   },
   {
     id: 'game-design',
-    color: C.game,
+    color: EARTH.game,
+    glow: C.game,
     title: 'Game design',
     body: "Systems that are fun to push against. I build in Godot and I'm working on a browser action-RPG engine, always chasing game feel: responsive input, readable feedback, squash and stretch.",
     tags: ['Godot', 'Game feel', 'Systems', 'Engines'],
@@ -328,7 +338,8 @@ const CRAFTS: { id: string; color: string; title: string; body: string; tags: st
   },
   {
     id: 'music',
-    color: C.music,
+    color: EARTH.music,
+    glow: C.music,
     title: 'Music',
     body: "Composition and sound, and the code that connects them: Web Audio synthesis, DSP, and tools for shaping what you hear. Turn the sound on up top to hear what I mean. It's all synthesized live.",
     tags: ['Composition', 'Sound design', 'Web Audio', 'DSP'],
@@ -372,7 +383,7 @@ export default function Crafts() {
 
         <div className="crafts-grid">
           {CRAFTS.map((c, i) => (
-            <Reveal key={c.id} as="article" className="craft" delay={i * 0.08} style={{ '--c': c.color } as CSSProperties}>
+            <Reveal key={c.id} as="article" className="craft" delay={i * 0.08} style={{ '--c': c.color, '--glow': c.glow } as CSSProperties}>
               <div className="craft-visual">{c.visual}</div>
               <div className="craft-meta">
                 <span className="craft-num">0{i + 1}</span>
