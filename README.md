@@ -1,51 +1,47 @@
 # Zach Brewer — Personal Site
 
-A single-page site built around one idea: **one line, four crafts.** The hero
-is a 32-second film, drawn live on a canvas, in which a single glowing line
-performs programming → design → game design → music. The page below it is a
-warm, editorial layout: About, Crafts, Experience, and Contact.
+A single-page site with a hero **reel**: a 22-second piece drawn live on a
+canvas, in the same minimalist language as the page. It's ink hairlines on
+paper, set up as a technical drawing: an index, four figures (Engineering,
+Interface design, Game systems, Sound) and the ZB monogram constructed with
+compass and grid. Below it is an editorial page: About, Disciplines,
+Experience, and Contact.
 
 It's React + TypeScript + Vite, **pre-rendered to static HTML** at build time
-for SEO, then hydrated. The film and its soundtrack are hand-written Canvas 2D
-and Web Audio, with no animation or audio libraries and no video files.
+for SEO, then hydrated. The reel and its optional soundtrack are hand-written
+Canvas 2D and Web Audio, with no animation or audio libraries and no video files.
 
-## The film (`src/film/`)
+## The reel (`src/film/`)
 
-Everything in the film is a pure function of time, so it can loop, pause,
-seek (the chapter bars are a scrubber) and stay in sync with sound.
+Everything is a pure function of time, so it can pause, seek (the chapter bars
+are a scrubber), replay, and stay locked to the audio clock.
 
 | File | Role |
 | --- | --- |
-| `timeline.ts` | 120 BPM grid: beat 0.5s, bar 2s, chapter = 4 bars = 8s, loop = 32s |
-| `engine.ts` | Fits the frame, blends chapters at boundaries, draws the line (halo → glow → body → core + a half-res motion trail) |
-| `line.ts` | The line is 520 points. `resample` (arc-length), `blend` (travelling wipe), `uncurl` (curvature-space straightening) |
-| `scenes/code.ts` | Code types itself; the caret leaps as a comet and plots `cubic-bezier(0.65, 0, 0.35, 1)` |
-| `scenes/design.ts` | Pen-tool handles are dragged (live properties panel), bounding box + smart guides, golden spiral, which unrolls into… |
-| `scenes/game.ts` | …a level: hills, spikes, a block, coins, a squash-and-stretch hero, and a stomp that strikes… |
-| `scenes/music.ts` | …a string, which becomes a waveform made of four partials (one per discipline), then reels back into the caret |
-| `harmony.ts` | The chord chart (Fmaj9 → G6 → Em7 → Am9) shared by picture and sound |
-| `score.ts` | Generative soundtrack: pads, bass, FM bells, Karplus-Strong strings, drums, all scheduled from the same event times as the picture |
+| `timeline.ts` | 128 BPM. Index + four 8-beat figures + resolve = 48 beats. Palette, chapter captions |
+| `engine.ts` | Paper stage, figure/caption layout, hairline wipes between sections, crop marks, beat ruler and timecode |
+| `kit.ts` | Draw-on primitives (lines, rects, arcs, polylines), dimension lines, registration marks, hatching, masked serif type, figure captions |
+| `scenes/open.ts` | Index: a ruled line field with a travelling lens, the contents with timecodes as page numbers |
+| `scenes/code.ts` | Fig. 01: an editor types a pipeline while a service topology routes itself, packets flow and the mainframe is retired |
+| `scenes/design.ts` | Fig. 02: 12-column grid, a wireframe with redlines, a bezier editor, a type specimen, the palette |
+| `scenes/game.ts` | Fig. 03: 260 agents in waves along a flow field, resolved on a 16th-note grid of sweeps and bursts, then a structure cut and shattered |
+| `scenes/music.ts` | Fig. 04: a staff whose notes are the melody you hear, a waveform, the drum sequencer and a spectrum |
+| `scenes/resolve.ts` | The ZB mark as a construction drawing, then the idle state |
+| `score.ts`, `harmony.ts` | Generative soundtrack, scheduled from the same beat times as the picture |
 | `sound.ts` | "Sound on" store. The score takes over the film's clock so they can't drift |
-| `layout.ts` | Choreography frames: 1600×900 landscape, 700×900 portrait |
+| `logo.ts` | ZB monogram geometry (also mirrored in `scripts/generate-og.mjs`) |
 
-Scenes are choreographed in a virtual frame that the engine fits between the
-nav and the hero's type block (`setSafeArea`, measured by `Hero.tsx`).
-Terrain and the string read `visL/visR` to run edge to edge.
-
-**Reduced motion:** the film starts paused on a still (`POSTER_TIME`), and
-visitors can press Play. There's always a Pause control.
-
-**Easter egg:** the Konami code toggles the "director's commentary", which
-draws the rig: sample points, control polygons, clock source and fps.
-
-In dev, `window.__film` exposes the engine (`__film.pause(); __film.seek(12.4)`)
-for frame-accurate review.
+The reel plays once per session and resolves into the real HTML wordmark
+(`Zach Brewer`), then idles. **Reduced motion:** it starts resolved and paused.
+**Easter egg:** the Konami code toggles the director's commentary (figure
+bounds, beat clock, fps, hitboxes). In dev, `window.__film` exposes the engine
+(`__film.pause(); __film.seek(12.4)`) for frame-accurate review.
 
 ## Design
 
-- Dark film stage, then a warm paper page (`--color-paper #f2efe8`, ink `#131312`, one vermilion accent `#ff5a36`)
-- Discipline hues appear only where something moves: code `#7c9dff`, design `#ff6b4a`, game `#3fe0a0`, music `#ffc24d`
-- Type: Instrument Serif (display), Geist (text), Geist Mono (labels and film UI)
+- One surface: paper `#f3f6f2`, ink `#122630`, with ocean `#2b6a93`, lagoon `#1f8a86`, moss `#3f7a55` and fern `#6f952f` as accents
+- Linework over fills: 1px hairlines, crop marks, rulers, dimension lines
+- Type: Instrument Serif (display), Geist (text), Geist Mono (labels and annotations)
 - Tokens live in `src/index.css` under `@theme`
 
 ## Pre-rendering (SEO)
@@ -63,8 +59,10 @@ and only rendered when opened.
 
 SEO assets: `index.html` carries full meta + Open Graph + Twitter + JSON-LD
 `Person` schema; `public/robots.txt`, `public/sitemap.xml`, `public/humans.txt`.
-Regenerate `public/og-image.png` and `public/apple-touch-icon.png` with
-`node scripts/generate-og.mjs`.
+Regenerate `public/favicon.svg`, `public/og-image.png` and
+`public/apple-touch-icon.png` with `node scripts/generate-og.mjs`. It uses
+opentype.js (pinned to 1.3; 2.x mis-parses the italic) and
+`@fontsource/instrument-serif` to set the wordmark as paths.
 
 ## Security
 

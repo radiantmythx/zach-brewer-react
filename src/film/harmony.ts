@@ -20,8 +20,8 @@ export const CHORDS: Record<'Am9' | 'Fmaj7' | 'Cmaj9' | 'G6', ChordDef> = {
 
 type Name = keyof typeof CHORDS
 
-/** chord per bar of the reel (13 bars) */
-export const REEL_CHORDS: Name[] = ['Am9', 'Am9', 'Am9', 'Fmaj7', 'Cmaj9', 'G6', 'Am9', 'Fmaj7', 'G6', 'Am9', 'Fmaj7', 'G6', 'Cmaj9']
+/** chord per bar of the reel (12 bars) */
+export const REEL_CHORDS: Name[] = ['Am9', 'Fmaj7', 'Am9', 'Fmaj7', 'Cmaj9', 'G6', 'Am9', 'Fmaj7', 'Am9', 'Fmaj7', 'G6', 'Cmaj9']
 
 /** idle ambience: two bars per chord */
 export const IDLE_CHORDS: Name[] = ['Am9', 'Am9', 'Fmaj7', 'Fmaj7', 'Cmaj9', 'Cmaj9', 'G6', 'G6']

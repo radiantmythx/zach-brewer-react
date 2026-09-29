@@ -1,5 +1,5 @@
 # zachbrewer.com
-# one line, four crafts. humans: visit / and turn the sound on.
+# four disciplines, one practice. humans: visit / and turn the sound on.
 # (see also: /humans.txt)
 
 User-agent: *

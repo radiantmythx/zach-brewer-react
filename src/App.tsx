@@ -18,17 +18,17 @@ export default function App() {
   const [toast, setToast] = useState<string | null>(null)
 
   // The one easter egg: the Konami code turns on the director's commentary,
-  // which reveals the film's rig (points, control polygons, clocks, fps).
+  // which reveals the reel's rig (figure bounds, beat clock, fps, hitboxes).
   useEffect(() => {
     console.log(
-      '%cZach Brewer%c  one line, four crafts',
-      'font: 400 22px "Instrument Serif", Georgia, serif; color: #f2efe8; background: #08080a; padding: 8px 4px 8px 12px;',
-      'font: 12px "Geist Mono", monospace; color: #ffc24d; background: #08080a; padding: 12px 12px 12px 4px;',
+      '%cZach Brewer%c  Software Engineer & Designer',
+      'font: 400 22px "Instrument Serif", Georgia, serif; color: #122630; background: #f3f6f2; padding: 8px 4px 8px 12px;',
+      'font: 12px "Geist Mono", monospace; color: #3f7a55; background: #f3f6f2; padding: 12px 12px 12px 4px;',
     )
     console.log(
-      '%cThe film at the top of the page is drawn live: 520 points, four scenes, one clock, no video files.\n' +
-        'Want to see the rig? Try the Konami code on the page.  ↑ ↑ ↓ ↓ ← → ← → B A',
-      'font: 12px "Geist Mono", monospace; color: #7c9dff; line-height: 1.7;',
+      '%cThe reel above is drawn live on a canvas: six scenes, one clock, no video files.\n' +
+        'The Konami code reveals the rig behind it.  ↑ ↑ ↓ ↓ ← → ← → B A',
+      'font: 12px "Geist Mono", monospace; color: #2b6a93; line-height: 1.7;',
     )
 
     let i = 0

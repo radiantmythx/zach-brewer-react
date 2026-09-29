@@ -1,8 +1,7 @@
 /* ─────────────────────────────────────────────────
 
-        ●───╮
-            ╰──────●         one line,
-                             four crafts.
+        ┼          four disciplines.
+                   one practice.
 
    ───────────────────────────────────────────────── */
 
@@ -15,9 +14,9 @@ GitHub: https://github.com/radiantmythx
 LinkedIn: https://www.linkedin.com/in/zachary-brewer-88653269/
 
 /* SITE */
-Concept: one continuous line performs a 32-second film in four
-         chapters: programming → design → game design → music
-Film: hand-written Canvas 2D, rendered live every frame
+Concept: a reel drawn as a technical drawing (an index, four
+         figures, and the ZB monogram constructed with compass and grid)
+Reel: hand-written Canvas 2D, rendered live every frame
 Score: generative Web Audio, synthesized in the browser
        (no samples, no video files)
 Stack: React 19, TypeScript, Vite, Tailwind v4
@@ -25,7 +24,7 @@ Rendering: pre-rendered static HTML + hydration
 Type: Instrument Serif, Geist, Geist Mono
 
 /* STANDARDS */
-Accessibility: reduced motion respected (the film starts
-               paused), pause control, keyboard friendly
+Accessibility: reduced motion respected (the reel starts
+               resolved and paused), pause control, keyboard friendly
 Easter eggs: exactly one. ↑ ↑ ↓ ↓ ← → ← → B A
 Last updated: 2026-09

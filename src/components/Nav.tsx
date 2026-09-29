@@ -47,7 +47,7 @@ export default function Nav({ onResumeClick }: NavProps) {
       </a>
       <nav className="nav-links" aria-label="Primary">
         <a className="link-u nav-optional" href="#about">About</a>
-        <a className="link-u nav-optional" href="#crafts">Crafts</a>
+        <a className="link-u nav-optional" href="#disciplines">Disciplines</a>
         <a className="link-u nav-optional" href="#experience">Experience</a>
         <a className="link-u" href="#contact">Contact</a>
         <button type="button" className="nav-cta" onClick={onResumeClick}>

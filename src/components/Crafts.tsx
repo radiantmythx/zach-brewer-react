@@ -2,23 +2,23 @@ import { useEffect, useRef, type CSSProperties, type ReactNode } from 'react'
 import Reveal, { Lines } from './Reveal'
 
 /*
- * Four crafts, each with a tiny looping "film still" drawn in SVG + SMIL —
- * the same vocabulary as the hero, at postcard size. Animations pause when
- * offscreen and never start for reduced-motion visitors.
+ * Four disciplines, each with a small looping figure drawn in SVG + SMIL —
+ * the reel's linework language at card size. Animations pause offscreen and
+ * never start for reduced-motion visitors.
  */
 
-/* neon inside the dark vignettes, earth tones on the page */
-const C = {
-  code: '#5CA8FF',
-  design: '#3DE3F5',
-  game: '#3DFFA8',
-  music: '#B8FF5C',
-  text: '#E6F0EE',
-  dim: '#566872',
-  hot: '#FF4F8B',
-  violet: '#8B7CFF',
+const INK = {
+  ink: '#122630',
+  ink2: '#3A4F58',
+  muted: '#6C7F86',
+  rule: 'rgba(18,38,48,0.14)',
+  faint: 'rgba(18,38,48,0.07)',
+  ocean: '#2B6A93',
+  lagoon: '#1F8A86',
+  moss: '#3F7A55',
+  fern: '#6F952F',
 }
-const EARTH = { code: '#2B6A93', design: '#1F8A86', game: '#3F7A55', music: '#6F952F' }
+const MONO = '"Geist Mono", ui-monospace, monospace'
 
 function useSmil() {
   const ref = useRef<SVGSVGElement>(null)
@@ -36,107 +36,124 @@ function useSmil() {
   return ref
 }
 
-/* ---- 01 programming: code typing itself, token by token ---- */
+function Grid({ id, step = 16, color = INK.faint }: { id: string; step?: number; color?: string }) {
+  return (
+    <>
+      <defs>
+        <pattern id={id} width={step} height={step} patternUnits="userSpaceOnUse">
+          <path d={`M${step} 0 V${step} H0`} fill="none" stroke={color} strokeWidth="0.6" />
+        </pattern>
+      </defs>
+      <rect width="320" height="220" fill={`url(#${id})`} />
+    </>
+  )
+}
 
-const CODE_ROWS: { y: number; segs: [number, number, string][] }[] = [
-  { y: 44, segs: [[48, 118, C.dim]] },
-  { y: 70, segs: [[48, 22, C.code], [78, 50, C.text], [136, 48, C.game]] },
-  { y: 94, segs: [[72, 28, C.music], [108, 14, C.dim], [130, 28, C.music]] },
-  { y: 118, segs: [[48, 8, C.dim]] },
-  { y: 142, segs: [[48, 40, C.code], [96, 44, C.game], [148, 18, C.dim]] },
-  { y: 166, segs: [[72, 66, C.text], [146, 38, C.music]] },
-  { y: 190, segs: [[48, 8, C.dim]] },
+/* ---- 01 engineering: a small architecture with packets in flight ---- */
+
+const NODES = [
+  { x: 28, y: 34, label: 'CLIENT' },
+  { x: 124, y: 34, label: 'GATEWAY' },
+  { x: 220, y: 34, label: 'AZURE' },
+  { x: 124, y: 96, label: 'GRAPHQL' },
+  { x: 28, y: 158, label: 'LOANS' },
+  { x: 124, y: 158, label: 'SERVICING' },
+  { x: 220, y: 158, label: 'RISK' },
 ]
-const CODE_CYCLE = 6
-const CODE_TIMING = (() => {
-  let t = 0.35
-  return CODE_ROWS.map((row) => {
-    const segs = row.segs.map(([x, len, color]) => {
-      const start = t
-      const dur = len / 190
-      t += dur + 0.05
-      return { x, len, color, k0: start / CODE_CYCLE, k1: (start + dur) / CODE_CYCLE }
-    })
-    t += 0.12
-    return { y: row.y, segs }
-  })
-})()
+const W = 72
+const H = 24
+const cxn = (i: number) => NODES[i].x + W / 2
+const EDGE_PATHS = [
+  `M${NODES[0].x + W} 46 H${NODES[1].x}`,
+  `M${NODES[1].x + W} 46 H${NODES[2].x}`,
+  `M${cxn(1)} ${34 + H} V96`,
+  `M${cxn(3)} ${96 + H} V139 H${cxn(4)} V158`,
+  `M${cxn(3)} ${96 + H} V158`,
+  `M${cxn(3)} ${96 + H} V139 H${cxn(6)} V158`,
+]
 
-function CodeVisual() {
+function EngineeringVisual() {
   const ref = useSmil()
   return (
     <svg ref={ref} viewBox="0 0 320 220" aria-hidden="true">
-      {CODE_ROWS.map((r, i) => (
-        <rect key={i} x="24" y={r.y - 1.5} width="6" height="3" rx="1.5" fill="rgba(255,255,255,0.12)" />
+      <Grid id="gridEng" color="rgba(43,106,147,0.08)" />
+      {EDGE_PATHS.map((d, i) => (
+        <path key={i} d={d} fill="none" stroke={INK.ink} strokeOpacity="0.45" strokeWidth="0.8" />
       ))}
-      <g>
-        <animate attributeName="opacity" values="1;1;0;0;1" keyTimes="0;0.86;0.91;0.97;1" dur={`${CODE_CYCLE}s`} repeatCount="indefinite" />
-        {CODE_TIMING.map((row) =>
-          row.segs.map((s, j) => (
-            <line
-              key={`${row.y}-${j}`}
-              x1={s.x}
-              y1={row.y}
-              x2={s.x + s.len}
-              y2={row.y}
-              stroke={s.color}
-              strokeWidth="7"
-              strokeLinecap="round"
-              strokeDasharray={`${s.len} ${s.len * 2 + 20}`}
-              strokeDashoffset={s.len}
-            >
-              <animate
-                attributeName="stroke-dashoffset"
-                values={`${s.len};${s.len};0;0;${s.len};${s.len}`}
-                keyTimes={`0;${s.k0.toFixed(4)};${s.k1.toFixed(4)};0.92;0.93;1`}
-                dur={`${CODE_CYCLE}s`}
-                repeatCount="indefinite"
-              />
-            </line>
-          )),
-        )}
-      </g>
-      <rect x="64" y="181" width="2.4" height="18" rx="1" fill={C.code}>
-        <animate attributeName="opacity" values="1;1;0;0" keyTimes="0;0.5;0.5;1" dur="1.05s" repeatCount="indefinite" />
-      </rect>
+      {EDGE_PATHS.map((d, i) =>
+        [0, 1].map((k) => (
+          <rect key={`${i}-${k}`} x="-2" y="-2" width="4" height="4" fill={i % 2 ? INK.lagoon : INK.ocean}>
+            <animateMotion path={d} dur={`${1.2 + (i % 3) * 0.35}s`} begin={`${k * 0.6 + i * 0.13}s`} repeatCount="indefinite" />
+          </rect>
+        )),
+      )}
+      {NODES.map((n, i) => (
+        <g key={n.label}>
+          <rect x={n.x} y={n.y} width={W} height={H} fill="#F8FAF7" stroke={INK.ink} strokeWidth="0.8" />
+          <text x={n.x + 7} y={n.y + 15} fontFamily={MONO} fontSize="7" fill={INK.ink} letterSpacing="0.5">
+            {n.label}
+          </text>
+          <rect x={n.x + W - 9} y={n.y + 10} width="4" height="4" fill={INK.moss}>
+            <animate attributeName="opacity" values="1;0.2;1" dur={`${0.8 + (i % 3) * 0.3}s`} repeatCount="indefinite" />
+          </rect>
+        </g>
+      ))}
+      <text x="28" y="206" fontFamily={MONO} fontSize="6.5" fill={INK.muted} letterSpacing="0.6">
+        FIG. 01 — SERVICE TOPOLOGY
+      </text>
     </svg>
   )
 }
 
-/* ---- 02 design: a bezier path whose handles are being dragged ---- */
+/* ---- 02 interface design: grid, wireframe, and an easing being tuned ---- */
 
-const P0 = [64, 170]
-const P3 = [256, 52]
-const K1 = [[180, 170], [228, 198], [138, 190], [180, 170]]
-const K2 = [[140, 52], [96, 20], [176, 28], [140, 52]]
+const P0 = [184, 176]
+const P3 = [296, 64]
+const K1 = [[257, 176], [274, 196], [240, 186], [257, 176]]
+const K2 = [[223, 64], [202, 40], [236, 52], [223, 64]]
 const SPL = '0.65 0 0.35 1;0.65 0 0.35 1;0.65 0 0.35 1'
-const pathAt = (i: number) => `M${P0[0]} ${P0[1]} C${K1[i][0]} ${K1[i][1]} ${K2[i][0]} ${K2[i][1]} ${P3[0]} ${P3[1]}`
-const D_VALUES = [0, 1, 2, 3].map(pathAt).join(';')
+const dAt = (i: number) => `M${P0[0]} ${P0[1]} C${K1[i][0]} ${K1[i][1]} ${K2[i][0]} ${K2[i][1]} ${P3[0]} ${P3[1]}`
+const D_VALUES = [0, 1, 2, 3].map(dAt).join(';')
 const vals = (pts: number[][], axis: 0 | 1) => pts.map((p) => p[axis]).join(';')
 
 function Smil({ attr, values }: { attr: string; values: string }) {
-  return (
-    <animate attributeName={attr} values={values} keyTimes="0;0.33;0.66;1" calcMode="spline" keySplines={SPL} dur="6s" repeatCount="indefinite" />
-  )
+  return <animate attributeName={attr} values={values} keyTimes="0;0.33;0.66;1" calcMode="spline" keySplines={SPL} dur="6s" repeatCount="indefinite" />
 }
 
-function DesignVisual() {
+function InterfaceVisual() {
   const ref = useSmil()
   return (
     <svg ref={ref} viewBox="0 0 320 220" aria-hidden="true">
-      <defs>
-        <pattern id="dotgrid" width="16" height="16" patternUnits="userSpaceOnUse">
-          <circle cx="8" cy="8" r="0.8" fill="rgba(255,255,255,0.14)" />
-        </pattern>
-      </defs>
-      <rect width="320" height="220" fill="url(#dotgrid)" />
-      <path d={pathAt(0)} fill="none" stroke={C.design} strokeOpacity="0.2" strokeWidth="9" strokeLinecap="round">
+      {Array.from({ length: 6 }, (_, c) => (
+        <rect key={c} x={24 + c * 47} y="0" width="39" height="220" fill="rgba(31,138,134,0.035)" stroke="rgba(31,138,134,0.16)" strokeWidth="0.6" />
+      ))}
+      {/* wireframe card */}
+      <rect x="24" y="30" width="133" height="160" fill="#F8FAF7" stroke={INK.ink} strokeWidth="0.8" />
+      <rect x="32" y="38" width="117" height="62" fill="none" stroke={INK.ink} strokeOpacity="0.4" strokeWidth="0.6" />
+      <path d="M32 38 L149 100 M149 38 L32 100" stroke={INK.ink} strokeOpacity="0.15" strokeWidth="0.6" />
+      <text x="32" y="122" fontFamily='"Instrument Serif", Georgia, serif' fontSize="15" fill={INK.ink}>
+        Considered interfaces
+      </text>
+      {[132, 140, 148].map((y, i) => (
+        <line key={y} x1="32" y1={y} x2={[140, 146, 100][i]} y2={y} stroke={INK.ink} strokeOpacity="0.14" strokeWidth="3" strokeLinecap="round" />
+      ))}
+      <rect x="32" y="160" width="58" height="20" rx="10" fill="none" stroke={INK.ink} strokeWidth="0.8" />
+      {/* redline */}
+      <g stroke={INK.fern} strokeWidth="0.7">
+        <line x1="24" y1="22" x2="157" y2="22" />
+        <line x1="24" y1="19" x2="24" y2="25" />
+        <line x1="157" y1="19" x2="157" y2="25" />
+        <animate attributeName="opacity" values="0;1;1;0" keyTimes="0;0.15;0.8;1" dur="3s" repeatCount="indefinite" />
+      </g>
+      <text x="90" y="16" textAnchor="middle" fontFamily={MONO} fontSize="6" fill={INK.fern}>
+        133
+      </text>
+      {/* easing editor */}
+      <path d={`M${P0[0]} ${P0[1]} H${P3[0]} M${P0[0]} ${P0[1]} V${P3[1]}`} stroke={INK.ink} strokeOpacity="0.5" strokeWidth="0.7" fill="none" />
+      <path d={dAt(0)} fill="none" stroke={INK.lagoon} strokeWidth="1.4">
         <Smil attr="d" values={D_VALUES} />
       </path>
-      <path d={pathAt(0)} fill="none" stroke="#D8FBFF" strokeWidth="2" strokeLinecap="round">
-        <Smil attr="d" values={D_VALUES} />
-      </path>
-      <g stroke="rgba(255,255,255,0.5)" strokeWidth="1">
+      <g stroke={INK.ink} strokeOpacity="0.5" strokeWidth="0.6">
         <line x1={P0[0]} y1={P0[1]} x2={K1[0][0]} y2={K1[0][1]}>
           <Smil attr="x2" values={vals(K1, 0)} />
           <Smil attr="y2" values={vals(K1, 1)} />
@@ -146,236 +163,202 @@ function DesignVisual() {
           <Smil attr="y2" values={vals(K2, 1)} />
         </line>
       </g>
-      <circle cx={K1[0][0]} cy={K1[0][1]} r="4" fill="#fff">
-        <Smil attr="cx" values={vals(K1, 0)} />
-        <Smil attr="cy" values={vals(K1, 1)} />
-      </circle>
-      <circle cx={K2[0][0]} cy={K2[0][1]} r="4" fill={C.design}>
-        <Smil attr="cx" values={vals(K2, 0)} />
-        <Smil attr="cy" values={vals(K2, 1)} />
-      </circle>
-      {[P0, P3].map(([x, y]) => (
-        <rect key={x} x={x - 4.5} y={y - 4.5} width="9" height="9" fill="#0B0B0E" stroke="#fff" strokeWidth="1.3" />
+      {[K1, K2].map((K, i) => (
+        <circle key={i} cx={K[0][0]} cy={K[0][1]} r="3" fill={i ? INK.lagoon : '#F8FAF7'} stroke={INK.lagoon} strokeWidth="0.8">
+          <Smil attr="cx" values={vals(K, 0)} />
+          <Smil attr="cy" values={vals(K, 1)} />
+        </circle>
       ))}
-      <g>
-        <animateTransform
-          attributeName="transform"
-          type="translate"
-          values={K2.map((p) => `${p[0]} ${p[1]}`).join(';')}
-          keyTimes="0;0.33;0.66;1"
-          calcMode="spline"
-          keySplines={SPL}
-          dur="6s"
-          repeatCount="indefinite"
-        />
-        <path d="M1 2 L1 18 L5.4 14 L8.4 20.4 L11 19.2 L8.2 13 L13.4 13 Z" fill="#fff" stroke="#0A0A0C" strokeWidth="1" />
-      </g>
+      {[P0, P3].map(([x, y]) => (
+        <rect key={x} x={x - 3} y={y - 3} width="6" height="6" fill="#F8FAF7" stroke={INK.ink} strokeWidth="0.8" />
+      ))}
     </svg>
   )
 }
 
-/* ---- 03 game dev: a top-down spin slash clearing a ring of enemies ---- */
+/* ---- 03 game systems: agents stream in, a sweep resolves them ---- */
 
-const ARENA = { x: 160, y: 112 }
-const FOES = Array.from({ length: 7 }, (_, k) => {
-  const a = (k / 7) * Math.PI * 2 + 0.3
-  return { a, x0: ARENA.x + Math.cos(a) * 118, y0: ARENA.y + Math.sin(a) * 86, x1: ARENA.x + Math.cos(a) * 34, y1: ARENA.y + Math.sin(a) * 30 }
+const SPIRALS = Array.from({ length: 8 }, (_, k) => {
+  const a0 = (k / 8) * Math.PI * 2
+  let d = ''
+  for (let s = 0; s <= 20; s++) {
+    const r = 92 * (1 - s / 22)
+    const a = a0 + (s / 20) * 1.4
+    d += `${s ? ' L' : 'M'}${(160 + Math.cos(a) * r).toFixed(1)} ${(112 + Math.sin(a) * r * 0.9).toFixed(1)}`
+  }
+  return d
 })
 
 function GameVisual() {
   const ref = useSmil()
-  const dur = '2.4s'
   return (
     <svg ref={ref} viewBox="0 0 320 220" aria-hidden="true">
-      <defs>
-        <pattern id="hexgrid" width="24" height="41.57" patternUnits="userSpaceOnUse">
-          <path d="M8 0 L16 0 L20 6.93 L16 13.86 L8 13.86 L4 6.93 Z M20 6.93 L28 6.93 M8 13.86 L4 20.78 L8 27.71 L16 27.71 L20 20.78 L16 13.86 M4 20.78 L-4 20.78 M8 27.71 L4 34.64 L8 41.57 M16 27.71 L20 34.64 L16 41.57 M20 34.64 L28 34.64" fill="none" stroke="rgba(61,227,245,0.12)" strokeWidth="0.8" />
-        </pattern>
-        <radialGradient id="arenaFade" cx="50%" cy="50%" r="60%">
-          <stop offset="0.6" stopColor="#05080D" stopOpacity="0" />
-          <stop offset="1" stopColor="#05080D" stopOpacity="1" />
-        </radialGradient>
-      </defs>
-      <rect width="320" height="220" fill="url(#hexgrid)" />
-      <rect width="320" height="220" fill="url(#arenaFade)" />
-      <ellipse cx={ARENA.x} cy={ARENA.y} rx="120" ry="88" fill="none" stroke={C.design} strokeOpacity="0.28" strokeDasharray="4 8" />
-
-      {FOES.map((f, k) => (
-        <g key={k}>
-          <animateTransform attributeName="transform" type="translate" values={`${f.x0} ${f.y0};${f.x1} ${f.y1};${f.x1 + Math.cos(f.a) * 16} ${f.y1 + Math.sin(f.a) * 14};${f.x1} ${f.y1}`} keyTimes="0;0.55;0.62;1" dur={dur} repeatCount="indefinite" />
-          <g transform={`rotate(${(f.a * 180) / Math.PI + 90})`}>
-            <path d="M0 -9 L8 6 L-8 6 Z" fill="rgba(139,124,255,0.3)" stroke={C.violet} strokeWidth="1.5">
-              <animate attributeName="fill" values="rgba(139,124,255,0.3);rgba(139,124,255,0.3);#ffffff;rgba(139,124,255,0.3)" keyTimes="0;0.55;0.58;1" dur={dur} repeatCount="indefinite" />
-            </path>
-            <circle r="2.2" fill={C.hot} />
-          </g>
-          <animate attributeName="opacity" values="0;1;1;0;0" keyTimes="0;0.08;0.6;0.64;1" dur={dur} repeatCount="indefinite" />
-        </g>
+      <ellipse cx="160" cy="112" rx="94" ry="85" fill="none" stroke={INK.ink} strokeOpacity="0.6" strokeWidth="0.8" />
+      {Array.from({ length: 48 }, (_, k) => {
+        const a = (k / 48) * Math.PI * 2
+        const l = k % 4 === 0 ? 6 : 3
+        return (
+          <line key={k} x1={160 + Math.cos(a) * 94} y1={112 + Math.sin(a) * 85} x2={160 + Math.cos(a) * (94 + l)} y2={112 + Math.sin(a) * (85 + l)} stroke={INK.ink} strokeOpacity="0.35" strokeWidth="0.6" />
+        )
+      })}
+      {SPIRALS.map((d, k) => (
+        <path key={k} d={d} fill="none" stroke={k % 2 ? INK.moss : INK.ocean} strokeOpacity="0.14" strokeWidth="0.7" />
       ))}
-
-      {FOES.map((f, k) => (
-        <circle key={`s${k}`} cx={f.x1} cy={f.y1} r="3" fill="none" stroke="#ffffff" strokeWidth="1.5" opacity="0">
-          <animate attributeName="r" values="3;3;16;16" keyTimes="0;0.58;0.74;1" dur={dur} repeatCount="indefinite" />
-          <animate attributeName="opacity" values="0;0;1;0;0" keyTimes="0;0.57;0.58;0.74;1" dur={dur} repeatCount="indefinite" />
-        </circle>
-      ))}
-
-      <g opacity="0">
-        <animate attributeName="opacity" values="0;0;1;1;0;0" keyTimes="0;0.53;0.55;0.62;0.72;1" dur={dur} repeatCount="indefinite" />
-        <animateTransform attributeName="transform" type="rotate" values={`0 ${ARENA.x} ${ARENA.y};0 ${ARENA.x} ${ARENA.y};360 ${ARENA.x} ${ARENA.y};360 ${ARENA.x} ${ARENA.y}`} keyTimes="0;0.53;0.66;1" dur={dur} repeatCount="indefinite" />
-        <path d={`M${ARENA.x} ${ARENA.y - 44} A44 40 0 1 1 ${ARENA.x - 44} ${ARENA.y}`} fill="none" stroke={C.design} strokeWidth="9" strokeOpacity="0.25" strokeLinecap="round" />
-        <path d={`M${ARENA.x} ${ARENA.y - 44} A44 40 0 1 1 ${ARENA.x - 44} ${ARENA.y}`} fill="none" stroke="#ffffff" strokeWidth="3" strokeLinecap="round" />
+      {SPIRALS.map((d, k) =>
+        [0, 1, 2].map((j) => (
+          <line key={`${k}-${j}`} x1="-4" y1="0" x2="4" y2="0" stroke={INK.ink} strokeWidth="1.2" strokeLinecap="round">
+            <animateMotion path={d} dur="1.6s" begin={`${(k * 0.2 + j * 0.53) % 1.6}s`} repeatCount="indefinite" rotate="auto" keyPoints="0;1" keyTimes="0;1" calcMode="spline" keySplines="0.5 0 1 1" />
+          </line>
+        )),
+      )}
+      <g>
+        <animateTransform attributeName="transform" type="rotate" values="0 160 112;360 160 112" dur="0.8s" repeatCount="indefinite" />
+        <path d="M160 82 A30 30 0 1 1 131 104" fill="none" stroke={INK.moss} strokeWidth="1.4" strokeLinecap="round">
+          <animate attributeName="opacity" values="1;0.15;1" dur="0.8s" repeatCount="indefinite" />
+        </path>
       </g>
-
-      <circle cx={ARENA.x} cy={ARENA.y} r="22" fill={C.design} opacity="0.12" />
-      <circle cx={ARENA.x} cy={ARENA.y} r="12" fill="none" stroke={C.design} strokeWidth="2" />
-      <circle cx={ARENA.x} cy={ARENA.y} r="7" fill="#ffffff" />
-
-      {[0, 3].map((k) => (
-        <text key={`d${k}`} x={FOES[k].x1} y={FOES[k].y1 - 14} textAnchor="middle" fontFamily="Unbounded, sans-serif" fontWeight="800" fontSize={k ? 13 : 10} fill={k ? '#FFD166' : '#ffffff'} opacity="0">
-          {k ? '512' : '128'}
-          <animate attributeName="opacity" values="0;0;1;1;0" keyTimes="0;0.58;0.62;0.82;0.92" dur={dur} repeatCount="indefinite" />
-          <animateTransform attributeName="transform" type="translate" values="0 0;0 0;0 -14" keyTimes="0;0.58;0.92" dur={dur} repeatCount="indefinite" />
-        </text>
-      ))}
-
-      <rect x="16" y="16" width="64" height="4" rx="2" fill="rgba(255,255,255,0.12)" />
-      <rect x="16" y="16" width="52" height="4" rx="2" fill={C.game} />
-      <text x="304" y="24" textAnchor="end" fontFamily="Unbounded, sans-serif" fontWeight="900" fontSize="14" fill="#ffffff">
-        x7
+      <g stroke={INK.ink} strokeWidth="0.7">
+        {Array.from({ length: 12 }, (_, k) => {
+          const a = (k / 12) * Math.PI * 2
+          return <line key={k} x1={160 + Math.cos(a) * 14} y1={112 + Math.sin(a) * 14} x2={160 + Math.cos(a) * 60} y2={112 + Math.sin(a) * 54} />
+        })}
+        <animate attributeName="opacity" values="0;0;1;0" keyTimes="0;0.7;0.75;1" dur="1.6s" repeatCount="indefinite" />
+      </g>
+      <circle cx="160" cy="112" r="6" fill="none" stroke={INK.moss} strokeWidth="1" />
+      <rect x="158.5" y="110.5" width="3" height="3" fill={INK.moss} />
+      <text x="16" y="22" fontFamily={MONO} fontSize="6.5" fill={INK.ink2} letterSpacing="0.6">
+        AGENTS 0260
+      </text>
+      <text x="16" y="32" fontFamily={MONO} fontSize="6.5" fill={INK.ocean} letterSpacing="0.6">
+        Δt 16.7 MS
       </text>
     </svg>
   )
 }
 
-/* ---- 04 music: four partials and the sound they sum to ---- */
+/* ---- 04 sound: notes land on a staff as the playhead passes ---- */
 
-const WAVE_FRAMES = 12
-const PARTIALS = [
-  { a: 20, k: 1.5, m: 1, color: C.code },
-  { a: 13, k: 1.89, m: 2, color: C.design },
-  { a: 10, k: 2.25, m: 2, color: C.game },
-  { a: 7, k: 3.0, m: 3, color: C.music },
+const NOTES = [
+  [60, 3], [86, 5], [112, 6], [138, 8], [164, 6], [190, 5], [216, 3], [242, 2], [268, 3],
 ]
-const waveY = (x: number, f: number) => {
-  const s = (x - 20) / 280
-  const w = Math.pow(Math.sin(Math.PI * s), 0.8)
-  let y = 0
-  PARTIALS.forEach((p, i) => (y += p.a * Math.sin(Math.PI * 2 * (p.k * s - p.m * f) + i)))
-  return 110 + y * w
-}
-const WAVE_VALUES = Array.from({ length: WAVE_FRAMES + 1 }, (_, fi) => {
-  const f = fi / WAVE_FRAMES
-  let d = ''
-  for (let i = 0; i <= 56; i++) {
-    const x = 20 + (i / 56) * 280
-    d += `${i ? ' L' : 'M'}${x.toFixed(1)} ${waveY(x, f).toFixed(1)}`
-  }
-  return d
-}).join(';')
-const sinePath = (amp: number, len: number) => {
-  let d = ''
-  for (let x = -len; x <= 320 + len; x += 6) d += `${x === -len ? 'M' : ' L'}${x} ${(110 + amp * Math.sin((x / len) * Math.PI * 2)).toFixed(1)}`
-  return d
-}
 
-function MusicVisual() {
+function SoundVisual() {
   const ref = useSmil()
-  const first = WAVE_VALUES.split(';')[0]
+  const bottom = 84
+  const gap = 9
+  const wave = (ph: number) => {
+    let d = ''
+    for (let i = 0; i <= 64; i++) {
+      const x = 24 + (i / 64) * 272
+      const s = i / 64
+      const y = 138 + Math.sin(s * 22 + ph) * 12 * Math.pow(Math.sin(Math.PI * s), 1.3) + Math.sin(s * 57 - ph * 2) * 4 * Math.sin(Math.PI * s)
+      d += `${i ? ' L' : 'M'}${x.toFixed(1)} ${y.toFixed(1)}`
+    }
+    return d
+  }
+  const WAVES = [0, 1.6, 3.2, 4.8, 6.28].map(wave).join(';')
   return (
     <svg ref={ref} viewBox="0 0 320 220" aria-hidden="true">
-      {PARTIALS.map((p, i) => {
-        const len = [186, 148, 124, 93][i]
+      {[0, 1, 2, 3, 4].map((k) => (
+        <line key={k} x1="24" y1={bottom - k * gap} x2="296" y2={bottom - k * gap} stroke={INK.ink} strokeOpacity="0.4" strokeWidth="0.6" />
+      ))}
+      <line x1="24" y1={bottom} x2="24" y2={bottom - 4 * gap} stroke={INK.ink} strokeOpacity="0.6" strokeWidth="0.7" />
+      <line x1="296" y1={bottom} x2="296" y2={bottom - 4 * gap} stroke={INK.ink} strokeOpacity="0.6" strokeWidth="0.7" />
+      {NOTES.map(([x, step], i) => {
+        const y = bottom - (step * gap) / 2
+        const at = (i / NOTES.length) * 0.9
         return (
-          <g key={i} opacity="0.4">
-            <animateTransform attributeName="transform" type="translate" from="0 0" to={`${len} 0`} dur={`${[4, 2, 2, 1.33][i]}s`} repeatCount="indefinite" />
-            <path d={sinePath(p.a, len)} fill="none" stroke={p.color} strokeWidth="1.2" />
+          <g key={i} opacity="0">
+            <ellipse cx={x} cy={y} rx="4.2" ry="3" transform={`rotate(-20 ${x} ${y})`} fill={INK.ink} />
+            <line x1={x + 3.8} y1={y} x2={x + 3.8} y2={y - 22} stroke={INK.ink} strokeWidth="0.8" />
+            <animate attributeName="opacity" values="0;0;1;1;0" keyTimes={`0;${at.toFixed(3)};${(at + 0.02).toFixed(3)};0.95;1`} dur="4s" repeatCount="indefinite" />
           </g>
         )
       })}
-      <path d={first} fill="none" stroke={C.music} strokeOpacity="0.22" strokeWidth="9" strokeLinecap="round" strokeLinejoin="round">
-        <animate attributeName="d" values={WAVE_VALUES} dur="4s" repeatCount="indefinite" />
+      <line x1="30" y1={bottom + 6} x2="30" y2={bottom - 4 * gap - 6} stroke={INK.fern} strokeWidth="0.9">
+        <animate attributeName="x1" values="30;290" dur="4s" repeatCount="indefinite" />
+        <animate attributeName="x2" values="30;290" dur="4s" repeatCount="indefinite" />
+      </line>
+      <path d={wave(0)} fill="none" stroke={INK.ink} strokeWidth="0.9">
+        <animate attributeName="d" values={WAVES} dur="2s" repeatCount="indefinite" />
       </path>
-      <path d={first} fill="none" stroke="#EFFFE0" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-        <animate attributeName="d" values={WAVE_VALUES} dur="4s" repeatCount="indefinite" />
-      </path>
-      {[0, 1, 2, 3].map((i) => (
-        <circle key={i} cx={142 + i * 12} cy="192" r="2.6" fill={C.music} opacity="0.2">
-          <animate attributeName="opacity" values="1;0.2;0.2" keyTimes="0;0.25;1" dur="2s" begin={`${i * 0.5}s`} repeatCount="indefinite" />
-        </circle>
-      ))}
+      <g stroke={INK.moss} strokeWidth="0.9">
+        {Array.from({ length: 34 }, (_, k) => {
+          const x = 24 + k * 8.2
+          const h = 6 + 22 * Math.pow(1 - k / 34, 0.7) * (0.5 + 0.5 * Math.sin(k * 1.7))
+          return (
+            <line key={k} x1={x} y1="198" x2={x} y2={198 - h}>
+              <animate attributeName="y2" values={`${198 - h};${198 - h * 0.45};${198 - h}`} dur={`${0.47 + (k % 4) * 0.12}s`} repeatCount="indefinite" />
+            </line>
+          )
+        })}
+      </g>
+      <line x1="24" y1="198.5" x2="296" y2="198.5" stroke={INK.ink} strokeOpacity="0.4" strokeWidth="0.6" />
     </svg>
   )
 }
 
-const CRAFTS: { id: string; color: string; glow: string; title: string; body: string; tags: string[]; visual: ReactNode }[] = [
+const CRAFTS: { id: string; color: string; title: string; body: string; tags: string[]; visual: ReactNode }[] = [
   {
-    id: 'programming',
-    color: EARTH.code,
-    glow: C.code,
-    title: 'Programming',
-    body: "Production systems at enterprise scale: React front ends, C#/.NET and GraphQL services, and the CI/CD pipelines that ship them. Lately I've also been leading AI-assisted development across my org.",
+    id: 'engineering',
+    color: INK.ocean,
+    title: 'Engineering',
+    body: 'Enterprise platforms built for scale and longevity: React front ends, C#/.NET and GraphQL services, and the CI/CD pipelines that deliver them. I also lead the adoption of AI-assisted development across my engineering organization.',
     tags: ['C# / .NET', 'React', 'TypeScript', 'GraphQL', 'Azure DevOps'],
-    visual: <CodeVisual />,
+    visual: <EngineeringVisual />,
   },
   {
-    id: 'design',
-    color: EARTH.design,
-    glow: C.design,
-    title: 'Design',
-    body: 'Interfaces with intent. I tune type, spacing and motion until they feel inevitable, and I care about the systems underneath that keep them consistent. This site is built by hand, frame by frame.',
-    tags: ['Interface', 'Motion', 'Typography', 'Design systems'],
-    visual: <DesignVisual />,
+    id: 'interface-design',
+    color: INK.lagoon,
+    title: 'Interface design',
+    body: 'Interfaces designed with intent: typography, layout systems and motion tuned for clarity, and the design systems that keep them consistent. This site is designed and built by hand.',
+    tags: ['Interface', 'Typography', 'Motion', 'Design systems'],
+    visual: <InterfaceVisual />,
   },
   {
-    id: 'game-design',
-    color: EARTH.game,
-    glow: C.game,
-    title: 'Game design',
-    body: "Systems that are fun to push against. I build in Godot and I'm working on a browser action-RPG engine, always chasing game feel: responsive input, readable feedback, squash and stretch.",
-    tags: ['Godot', 'Game feel', 'Systems', 'Engines'],
+    id: 'game-systems',
+    color: INK.moss,
+    title: 'Game systems',
+    body: 'Real-time systems and game feel: responsive input, readable feedback and deterministic simulation. I build in Godot and am developing a browser-based action RPG engine.',
+    tags: ['Godot', 'Simulation', 'Game feel', 'Engines'],
     visual: <GameVisual />,
   },
   {
-    id: 'music',
-    color: EARTH.music,
-    glow: C.music,
-    title: 'Music',
-    body: "Composition and sound, and the code that connects them: Web Audio synthesis, DSP, and tools for shaping what you hear. Turn the sound on up top to hear what I mean. It's all synthesized live.",
+    id: 'sound',
+    color: INK.fern,
+    title: 'Sound',
+    body: 'Composition and sound design, and the software between them: Web Audio synthesis, DSP and custom audio tools. The score for the reel above is synthesized live in your browser.',
     tags: ['Composition', 'Sound design', 'Web Audio', 'DSP'],
-    visual: <MusicVisual />,
+    visual: <SoundVisual />,
   },
 ]
 
 export default function Crafts() {
   return (
-    <section id="crafts" className="section">
+    <section id="disciplines" className="section">
       <div className="container">
         <header className="section-head">
           <Reveal>
-            <p className="label">(02) Crafts</p>
+            <p className="label">(02) Disciplines</p>
           </Reveal>
           <div className="crafts-head">
             <Reveal as="h2" variant="lines" className="display">
               <Lines
                 lines={[
-                  'Four crafts.',
-                  <>
-                    <span className="scribble">
-                      <em>One line</em>
-                      <svg viewBox="0 0 200 20" preserveAspectRatio="none" aria-hidden="true">
-                        <path d="M2 14 C 40 4, 80 18, 120 10 S 180 6, 198 12" pathLength="1" />
-                      </svg>
-                    </span>{' '}
-                    through all of them.
-                  </>,
+                  'Four disciplines.',
+                  <span className="scribble" key="u">
+                    <em>One practice.</em>
+                    <svg viewBox="0 0 200 20" preserveAspectRatio="none" aria-hidden="true">
+                      <path d="M2 12 L198 12" pathLength="1" />
+                    </svg>
+                  </span>,
                 ]}
               />
             </Reveal>
             <Reveal delay={0.15}>
               <p className="crafts-intro">
-                Everything I make comes back to structure, feel and rhythm. The medium changes; the standard
-                doesn't. Here's how that shows up in each.
+                The same principles carry across every medium I work in: structure, clarity and close attention to
+                detail.
               </p>
             </Reveal>
           </div>
@@ -383,7 +366,7 @@ export default function Crafts() {
 
         <div className="crafts-grid">
           {CRAFTS.map((c, i) => (
-            <Reveal key={c.id} as="article" className="craft" delay={i * 0.08} style={{ '--c': c.color, '--glow': c.glow } as CSSProperties}>
+            <Reveal key={c.id} as="article" className="craft" delay={i * 0.08} style={{ '--c': c.color } as CSSProperties}>
               <div className="craft-visual">{c.visual}</div>
               <div className="craft-meta">
                 <span className="craft-num">0{i + 1}</span>

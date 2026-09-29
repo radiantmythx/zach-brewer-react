@@ -1,5 +1,5 @@
-import { font, MONO } from './kit'
-import { clamp, hash, hexToRgb, noise1, rgba } from './math'
+import { col, corner, font, line, MONO, reg } from './kit'
+import { clamp, easeInOutCubic, seg } from './math'
 import type { Env, FX, Scene } from './scene'
 import { codeScene } from './scenes/code'
 import { designScene } from './scenes/design'
@@ -7,7 +7,7 @@ import { gameScene } from './scenes/game'
 import { musicScene } from './scenes/music'
 import { openScene } from './scenes/open'
 import { resolveScene } from './scenes/resolve'
-import { BEAT, REEL_END, SECTIONS } from './timeline'
+import { BEAT, INK, REEL_BEATS, REEL_END, SECTIONS, WIPE, type Section } from './timeline'
 
 const SCENES: Record<string, Scene> = {
   open: openScene,
@@ -22,20 +22,24 @@ export interface FilmCallbacks {
   onFrame?: (t: number) => void
 }
 
+const tc = (s: number) => {
+  const m = Math.floor(s / 60)
+  const r = s - m * 60
+  return `${String(m).padStart(2, '0')}:${r.toFixed(2).padStart(5, '0')}`
+}
+
 /*
- * The reel renderer. Time is the only input: now() comes from the wall
- * clock, or from the Web Audio clock while the score plays, so picture and
- * sound can't drift. Each frame: gather camera/post FX from the active
- * scenes → draw them under the camera → HUD → glitch → bloom → flash.
+ * The reel renderer — linework on paper. Time is the only input: now()
+ * comes from the wall clock, or from the Web Audio clock while the score
+ * plays. Each frame: paper → the active figure (or two, split by a hairline
+ * wipe at section changes) → captions → the frame's crop marks and ruler.
  */
 export class FilmEngine {
   private canvas: HTMLCanvasElement
   private g: CanvasRenderingContext2D
-  private chain: HTMLCanvasElement[] = []
-  private chainG: CanvasRenderingContext2D[] = []
   private dpr = 1
   private env: Env
-  private fx: FX = { flash: 0, flashColor: '#FFFFFF', shake: 0, zoom: 1, rot: 0, glitch: 0, bloom: 1 }
+  private fx: FX = { zoom: 1 }
   private safe = { top: 80, bottom: 0, idleBottom: 0 }
   private hasSafe = false
 
@@ -55,17 +59,26 @@ export class FilmEngine {
   constructor(canvas: HTMLCanvasElement, cb: FilmCallbacks = {}) {
     this.canvas = canvas
     this.cb = cb
-    const g = canvas.getContext('2d', { alpha: true })
+    const g = canvas.getContext('2d', { alpha: false })
     if (!g) throw new Error('2D canvas unavailable')
     this.g = g
-    for (let i = 0; i < 4; i++) {
-      const c = document.createElement('canvas')
-      const cg = c.getContext('2d')
-      if (!cg) throw new Error('2D canvas unavailable')
-      this.chain.push(c)
-      this.chainG.push(cg)
+    this.env = {
+      W: 1,
+      H: 1,
+      fig: { x: 0, y: 0, w: 1, h: 1 },
+      cx: 0,
+      cy: 0,
+      U: 1,
+      portrait: false,
+      top: 0,
+      bottom: 1,
+      pad: 24,
+      logo: { x: 0, y: 0, size: 100 },
+      time: 0,
+      mx: 0,
+      my: 0,
+      debug: false,
     }
-    this.env = { W: 1, H: 1, cx: 0, cy: 0, U: 1, portrait: false, top: 0, bottom: 1, logo: { x: 0, y: 0, size: 100 }, time: 0, mx: 0, my: 0, debug: false }
     this.resize()
   }
 
@@ -167,44 +180,56 @@ export class FilmEngine {
     this.dpr = Math.min(window.devicePixelRatio || 1, 2)
     this.canvas.width = Math.round(W * this.dpr)
     this.canvas.height = Math.round(H * this.dpr)
-    this.chain.forEach((c, i) => {
-      const d = 2 ** (i + 1)
-      c.width = Math.max(1, Math.ceil(this.canvas.width / d))
-      c.height = Math.max(1, Math.ceil(this.canvas.height / d))
-    })
 
-    const top = this.hasSafe ? this.safe.top : H * 0.09
-    const bottom = this.hasSafe ? this.safe.bottom : H * 0.9
+    const top = this.hasSafe ? this.safe.top : H * 0.1
+    const bottom = this.hasSafe ? this.safe.bottom : H * 0.86
     const idleBottom = this.hasSafe ? this.safe.idleBottom : H * 0.6
-    const h = Math.max(120, bottom - top)
-    const portrait = W / h < 0.9
-    const U = portrait ? Math.min(W / 900, h / 1400) : Math.min(W / 1600, h / 900)
+    const pad = clamp(W * 0.04, 20, 56)
+    const tall = W / Math.max(1, bottom - top) < 0.9
+    const capH = tall ? 150 : 176
+    const fig = { x: pad, y: top + 40, w: W - pad * 2, h: Math.max(160, bottom - capH - (top + 40)) }
+    const portrait = fig.w / fig.h < 0.95
+    const U = portrait ? Math.min(fig.w / 700, fig.h / 800) : Math.min(fig.w / 1200, fig.h / 600)
     const ih = Math.max(80, idleBottom - top)
-    const size = clamp(Math.min(ih * 0.8, W * 0.5), 84, 360)
     Object.assign(this.env, {
       W,
       H,
-      cx: W / 2,
-      cy: top + h / 2,
+      fig,
+      cx: fig.x + fig.w / 2,
+      cy: fig.y + fig.h / 2,
       U,
       portrait,
       top,
       bottom,
-      logo: { x: W / 2, y: top + ih / 2, size },
+      pad,
+      logo: { x: W / 2, y: top + ih / 2, size: clamp(Math.min(ih * 0.72, W * 0.42), 80, 300) },
     })
     if (!this.running) this.render(this.now(), 1 / 60)
   }
 
   /* ---- render ---- */
 
-  private active(T: number) {
-    const b = T / BEAT
-    return SECTIONS.filter((s) => b >= s.from - 0.25 && (b < s.to + 0.25 || s.id === 'resolve'))
+  private sectionAt(b: number): Section {
+    for (const s of SECTIONS) if (b < s.to) return s
+    return SECTIONS[SECTIONS.length - 1]
+  }
+
+  private drawScene(s: Section, T: number, clip?: [number, number]) {
+    const { g, env } = this
+    g.save()
+    if (clip) {
+      g.beginPath()
+      g.rect(clip[0], 0, clip[1] - clip[0], env.H)
+      g.clip()
+    }
+    SCENES[s.id].draw(g, T - s.from * BEAT, env)
+    g.restore()
   }
 
   render(T: number, dt: number) {
     const { g, env, fx } = this
     T = Math.max(0, T)
+    const b = T / BEAT
     env.time = T
     env.debug = this.debug
     const ease = 1 - Math.exp(-dt * 3)
@@ -213,109 +238,121 @@ export class FilmEngine {
     env.mx = this.mouse.x
     env.my = this.mouse.y
 
-    const secs = this.active(T)
-    Object.assign(fx, { flash: 0, flashColor: '#FFFFFF', shake: 0, zoom: 1, rot: 0, glitch: 0, bloom: 1 })
-    for (const s of secs) SCENES[s.id].fx?.(T - s.from * BEAT, env, fx)
+    const cur = this.sectionAt(b)
+    const idx = SECTIONS.indexOf(cur)
+    const prev = idx > 0 ? SECTIONS[idx - 1] : null
+    const wipe = prev && b < cur.from + WIPE ? easeInOutCubic((b - cur.from) / WIPE) : 1
+
+    fx.zoom = 1
+    SCENES[cur.id].fx?.(T - cur.from * BEAT, env, fx)
 
     const d = this.dpr
-    g.setTransform(1, 0, 0, 1, 0, 0)
+    g.setTransform(d, 0, 0, d, 0, 0)
     g.globalCompositeOperation = 'source-over'
     g.globalAlpha = 1
-    g.clearRect(0, 0, this.canvas.width, this.canvas.height)
+    g.fillStyle = INK.paper
+    g.fillRect(0, 0, env.W, env.H)
 
-    // --- world, under the camera ---
-    const sh = Math.min(40, fx.shake)
-    const sx = sh * noise1(T * 31)
-    const sy = sh * noise1(T * 37 + 50)
-    g.setTransform(d, 0, 0, d, 0, 0)
-    g.translate(env.cx + sx, env.cy + sy)
-    if (fx.rot) g.rotate(fx.rot)
+    // --- the figure(s), under a gentle camera push ---
+    g.translate(env.cx, env.cy)
     g.scale(fx.zoom, fx.zoom)
     g.translate(-env.cx, -env.cy)
-    for (const s of secs) SCENES[s.id].draw(g, T - s.from * BEAT, env)
+    g.lineCap = 'round'
+    g.lineJoin = 'round'
+    const x = env.W * wipe
+    if (wipe < 1 && prev) {
+      this.drawScene(prev, T, [x, env.W])
+      this.drawScene(cur, T, [0, x])
+    } else this.drawScene(cur, T)
 
-    // --- HUD, steady ---
+    // --- captions, steady ---
     g.setTransform(d, 0, 0, d, 0, 0)
-    for (const s of secs) SCENES[s.id].hud?.(g, T - s.from * BEAT, env)
+    SCENES[cur.id].hud?.(g, T - cur.from * BEAT, env)
 
-    // --- glitch slices ---
-    if (fx.glitch > 0.02) {
-      g.setTransform(1, 0, 0, 1, 0, 0)
-      const cw = this.canvas.width
-      const ch = this.canvas.height
-      const f = Math.floor(T * 30)
-      for (let k = 0; k < 7; k++) {
-        const y = hash(k * 3.1 + f) * ch
-        const h = (0.015 + hash(k * 7.7 + f) * 0.07) * ch
-        const off = (hash(k * 5.3 + f) - 0.5) * 160 * d * clamp(fx.glitch)
-        g.drawImage(this.canvas, 0, y, cw, h, off, y, cw, h)
-      }
+    // --- the wipe's hairline ---
+    if (wipe < 1) {
+      g.strokeStyle = INK.ink
+      g.lineWidth = 1
+      line(g, x, env.top, x, env.bottom)
+      g.font = font(9.5, 500, MONO)
+      g.textAlign = 'left'
+      g.textBaseline = 'middle'
+      g.fillStyle = INK.ink
+      g.fillText(`→ 0${idx}`, x + 6, env.top + 44)
     }
 
-    // --- bloom: progressive downsample, add back the soft levels ---
-    const b = clamp(fx.bloom, 0, 3)
-    if (b > 0.01) {
-      let src: HTMLCanvasElement = this.canvas
-      for (let i = 0; i < this.chain.length; i++) {
-        const c = this.chain[i]
-        const cg = this.chainG[i]
-        cg.globalCompositeOperation = 'copy'
-        cg.drawImage(src, 0, 0, c.width, c.height)
-        src = c
-      }
-      g.setTransform(1, 0, 0, 1, 0, 0)
-      g.globalCompositeOperation = 'lighter'
-      const cw = this.canvas.width
-      const ch = this.canvas.height
-      g.globalAlpha = clamp(0.35 * b)
-      g.drawImage(this.chain[1], 0, 0, cw, ch)
-      g.globalAlpha = clamp(0.45 * b)
-      g.drawImage(this.chain[2], 0, 0, cw, ch)
-      g.globalAlpha = clamp(0.55 * b)
-      g.drawImage(this.chain[3], 0, 0, cw, ch)
-      g.globalAlpha = 1
-      g.globalCompositeOperation = 'source-over'
-    }
-
-    // --- flash frame ---
-    if (fx.flash > 0.003) {
-      g.setTransform(1, 0, 0, 1, 0, 0)
-      g.fillStyle = rgba(hexToRgb(fx.flashColor), clamp(fx.flash))
-      g.fillRect(0, 0, this.canvas.width, this.canvas.height)
-    }
-
-    if (this.debug) this.drawDebug(T, secs.map((s) => s.id))
+    this.drawFrame(b)
+    if (this.debug) this.drawDebug(T)
     this.cb.onFrame?.(T)
   }
 
-  /** Director's commentary: the rig behind the reel. */
-  private drawDebug(T: number, ids: string[]) {
+  /** Crop marks, a beat ruler and a timecode: the reel's technical frame. */
+  private drawFrame(b: number) {
     const { g, env } = this
+    const a = clamp(b / 0.6) * (1 - seg(b, 43.5, 45.5))
+    if (a <= 0.003) return
+    const { fig } = env
+    g.globalAlpha = a
+    g.strokeStyle = col(INK.ink, 0.55)
+    g.lineWidth = 1
+    const L = 14
+    const p = seg(b, 0, 1)
+    corner(g, fig.x, fig.y, 1, 1, L, p)
+    corner(g, fig.x + fig.w, fig.y, -1, 1, L, p)
+    corner(g, fig.x, fig.y + fig.h, 1, -1, L, p)
+    corner(g, fig.x + fig.w, fig.y + fig.h, -1, -1, L, p)
+    g.strokeStyle = col(INK.ink, 0.35)
+    reg(g, fig.x + fig.w / 2, fig.y - 14, 5, p)
+
+    // ruler
+    const x0 = env.pad
+    const x1 = env.W - env.pad
+    const y = env.top + 10
+    g.strokeStyle = col(INK.ink, 0.18)
+    line(g, x0, y, x1, y, seg(b, 0, 0.8))
+    g.beginPath()
+    for (let k = 0; k <= REEL_BEATS; k++) {
+      const x = x0 + ((x1 - x0) * k) / REEL_BEATS
+      if (x > x0 + (x1 - x0) * seg(b, 0, 0.8)) break
+      const h = k % 8 === 0 ? 7 : k % 4 === 0 ? 5 : 2.5
+      g.moveTo(x, y)
+      g.lineTo(x, y + h)
+    }
+    g.stroke()
+    const px = x0 + (x1 - x0) * clamp(b / REEL_BEATS)
+    g.strokeStyle = INK.ink
+    line(g, px, y - 4, px, y + 10)
+    g.font = font(9.5, 500, MONO)
+    g.textBaseline = 'middle'
+    g.fillStyle = INK.muted
+    g.textAlign = 'left'
+    g.fillText('SHOWREEL — 2026', x0, y + 20)
+    g.textAlign = 'right'
+    g.fillStyle = INK.ink2
+    g.fillText(`${tc(Math.min(b, REEL_BEATS) * BEAT)} / ${tc(REEL_END)}`, x1, y + 20)
+    g.globalAlpha = 1
+  }
+
+  /** Director's commentary: the rig behind the reel. */
+  private drawDebug(T: number) {
+    const { g, env } = this
+    const b = T / BEAT
+    const s = this.sectionAt(b)
     g.setTransform(this.dpr, 0, 0, this.dpr, 0, 0)
-    for (const s of SECTIONS) if (ids.includes(s.id)) SCENES[s.id].debug?.(g, T - s.from * BEAT, env)
-    g.strokeStyle = 'rgba(255,79,216,0.5)'
-    g.setLineDash([6, 6])
-    g.strokeRect(8, env.top, env.W - 16, env.bottom - env.top)
+    SCENES[s.id].debug?.(g, T - s.from * BEAT, env)
+    g.strokeStyle = 'rgba(214,51,132,0.6)'
+    g.setLineDash([5, 5])
+    g.strokeRect(env.fig.x, env.fig.y, env.fig.w, env.fig.h)
     g.setLineDash([])
-    const lb = T / BEAT
     g.font = font(11, 500, MONO)
     g.textAlign = 'left'
     g.textBaseline = 'middle'
-    g.fillStyle = 'rgba(255,79,216,0.95)'
-    const sec = SECTIONS.find((s) => lb >= s.from && lb < s.to)?.id ?? 'idle'
+    g.fillStyle = 'rgba(214,51,132,0.95)'
     const lines = [
       `DIRECTOR'S COMMENTARY`,
-      `t ${T.toFixed(2)}s   bar ${Math.floor(lb / 4) + 1}.${(Math.floor(lb) % 4) + 1}   beat ${lb.toFixed(2)}   ${sec}`,
+      `t ${T.toFixed(2)}s   bar ${Math.floor(b / 4) + 1}.${(Math.floor(b) % 4) + 1}   beat ${b.toFixed(2)}   ${b < REEL_BEATS ? s.id : 'idle'}`,
       `${Math.round(this.fps)} fps   ${this.clock ? 'audio clock' : 'wall clock'}   U ${env.U.toFixed(3)}   ${env.portrait ? 'portrait' : 'landscape'}`,
     ]
-    lines.forEach((l, i) => g.fillText(l, 20, env.top + 60 + i * 16))
-    // beat grid ticker
-    const w = env.W - 40
-    const y = env.bottom - 8
-    g.fillStyle = 'rgba(255,79,216,0.3)'
-    g.fillRect(20, y, w, 1)
-    for (let b = 0; b <= 52; b++) g.fillRect(20 + (b / 52) * w, y - (b % 4 ? 3 : 7), 1, b % 4 ? 3 : 7)
-    g.fillStyle = 'rgba(255,79,216,1)'
-    g.fillRect(20 + clamp(lb / 52) * w - 1, y - 12, 2, 14)
+    lines.forEach((l, i) => g.fillText(l, env.fig.x + 8, env.fig.y + 16 + i * 16))
   }
 }

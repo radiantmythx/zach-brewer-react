@@ -1,326 +1,256 @@
-import { bez, clamp, easeInCubic, easeInOutCubic, easeOutCubic, easeOutExpo, hash, lerp, seg, springOut, TAU } from '../math'
-import { burst, col, DISPLAY, font, glow, hits, MONO, polyPath, SERIF, slate, titleCard } from '../kit'
+import { B, caption, col, dim, font, line, maskText, MONO, pb, rect, SANS, SERIF, typeText } from '../kit'
+import { bez, clamp, cubicBezierEase, easeInOutSine, easeOutCubic, lerp, TAU } from '../math'
 import type { Env, Scene } from '../scene'
-import { BEAT, NEON } from '../timeline'
+import { CHAPTERS, INK } from '../timeline'
 
 /*
- * 02 DESIGN — beats 16–24.
- * The code's singularity becomes a pen: one fast swoosh with anchors and
- * handles. A modular grid shoots in, shapes snap into it on the beat with
- * bounding boxes and smart guides, a type specimen slams in and cycles
- * typefaces, a palette pops and recolours everything — then the hexagon
- * zooms through the lens and becomes the game's floor.
+ * FIG. 02 INTERFACE DESIGN — beats 16–24.
+ * A 12-column grid sweeps in. A wireframe card assembles on it and gets its
+ * redlines; a bezier editor tunes an easing curve (the readout updates
+ * live); a type specimen sets its metric lines above a type scale; the
+ * palette lands last.
  */
 
-const B = BEAT
+export const DESIGN_EVENT_BEATS = [0.7, 1.1, 1.7, 2.4, 2.8, 3.2, 3.6, 4.0, 4.8, 5.0, 5.2, 5.4, 5.6]
 
-// pen swoosh: three cubic segments, in composition units around centre
-const SWOOSH: [number, number][][] = [
-  [[0, 0], [220, -270], [540, -250], [580, -40]],
-  [[580, -40], [620, 170], [300, 310], [0, 230]],
-  [[0, 230], [-330, 150], [-620, -110], [-540, -300]],
-]
+type R = { x: number; y: number; w: number; h: number }
 
-const SHAPES = [
-  { kind: 3 as const, cell: [0, 0], at: 2 },
-  { kind: 4 as const, cell: [1, 1], at: 2.5 },
-  { kind: 0 as const, cell: [2, 0], at: 3 },
-  { kind: 6 as const, cell: [3, 1], at: 3.5 },
-]
-export const DESIGN_SNAP_BEATS = SHAPES.map((s) => s.at)
-const SWATCHES = [NEON.blue, NEON.cyan, NEON.mint, NEON.lime, NEON.hot]
-export const DESIGN_SWATCH_BEATS = SWATCHES.map((_, i) => 5 + i * 0.25)
-const FACES = [
-  { name: 'Instrument Serif', family: SERIF, weight: 400, style: '' },
-  { name: 'Unbounded 900', family: DISPLAY, weight: 900, style: '' },
-  { name: 'Geist Mono', family: MONO, weight: 500, style: '' },
-  { name: 'Instrument Serif Italic', family: SERIF, weight: 400, style: 'italic' },
-]
-
-function geom(env: Env) {
-  const p = env.portrait
-  const grid = p ? { x0: -400, x1: 400, y0: -560, y1: -60 } : { x0: -730, x1: -50, y0: -270, y1: 270 }
-  const cols = 4
-  const rows = 2
-  const cw = (grid.x1 - grid.x0) / cols
-  const ch = (grid.y1 - grid.y0) / rows
-  const spec = p ? { x: 0, y: 300 } : { x: 390, y: 10 }
-  const swatchY = p ? 600 : 380
-  const swatchX = p ? 0 : -390
-  return { grid, cols, rows, cw, ch, spec, swatchY, swatchX, r: Math.min(cw, ch) * 0.34 }
+function layout(env: Env) {
+  if (env.portrait)
+    return {
+      grid: { x: -330, w: 660, cols: 6 },
+      card: { x: -330, y: -390, w: 310, h: 360 },
+      curve: { x: 20, y: -390, w: 310, h: 230 },
+      spec: { x: -330, y: 150, w: 660, size: 140 },
+      swatch: { x: 22, y: -120 },
+    }
+  return {
+    grid: { x: -580, w: 1160, cols: 12 },
+    card: { x: -580, y: -250, w: 373, h: 470 },
+    curve: { x: -88, y: -210, w: 373, h: 300 },
+    spec: { x: 305, y: -10, w: 275, size: 170 },
+    swatch: { x: -88, y: 185 },
+  }
 }
 
-function shapePath(g: CanvasRenderingContext2D, kind: number, x: number, y: number, r: number, rot: number) {
-  if (kind === 0) {
-    g.beginPath()
-    g.arc(x, y, r, 0, TAU)
-  } else if (kind === 4) {
-    polyPath(g, x, y, r * 1.18, 4, rot + Math.PI / 4)
-  } else polyPath(g, x, y, r * (kind === 3 ? 1.2 : 1.08), kind, rot)
+function ctrl(lb: number) {
+  const a = easeInOutSine(clamp((lb - 2.6) / 1.6))
+  const b = easeInOutSine(clamp((lb - 4.4) / 1.6))
+  return {
+    x1: lerp(0.65, 0.82, a) - 0.1 * b,
+    y1: lerp(0, -0.18, a) + 0.18 * b,
+    x2: lerp(0.35, 0.18, a) + 0.17 * b,
+    y2: lerp(1, 1.22, a) - 0.22 * b,
+  }
 }
+
+const f2 = (v: number) => (v < 0 ? '−' : '') + Math.abs(v).toFixed(2)
 
 export const designScene: Scene = {
   id: 'design',
 
   fx(t, _env, fx) {
-    const lb = t / B
-    if (lb < -0.2 || lb > 8.2) return
-    fx.flash += hits(lb, [0], 0.35, 14) + hits(lb, [4], 0.25, 14) + hits(lb, [7.95], 0.6, 20)
-    fx.shake += hits(lb, DESIGN_SNAP_BEATS, 4, 14) + hits(lb, [4], 9, 10) + hits(lb, [6.5], 12, 8)
-    fx.zoom *= 1 + hits(lb, [4], 0.04, 9) + hits(lb, DESIGN_SNAP_BEATS, 0.012, 12)
-    fx.glitch += (lb >= 5 && lb < 5.08 ? 0.9 : 0) + (lb >= 5.5 && lb < 5.58 ? 0.9 : 0) + (lb >= 6 && lb < 6.08 ? 0.6 : 0)
+    fx.zoom *= 1 + 0.018 * clamp(t / (8 * B))
   },
 
   draw(g, t, env) {
     const lb = t / B
-    if (lb < 0 || lb >= 8) return
-    const { U, cx, cy } = env
-    const G = geom(env)
-    const sx = env.portrait ? 0.62 : 1
-    const P = (x: number, y: number): [number, number] => [cx + x * U, cy + y * U]
-    const blast = seg(lb, 6.5, 7.2, easeInCubic)
-    const out = (x: number, y: number, i: number): [number, number] => {
-      // everything but the hexagon flies outward on the blast
-      if (blast <= 0) return [x, y]
-      const a = Math.atan2(y - cy, x - cx) + (hash(i) - 0.5) * 0.6
-      const d = blast * 1400 * U
-      return [x + Math.cos(a) * d, y + Math.sin(a) * d]
+    const { U, cx, cy, fig } = env
+    const L = layout(env)
+    const X = (x: number) => cx + x * U
+    const Y = (y: number) => cy + y * U
+    g.lineWidth = 1
+
+    // --- the grid -----------------------------------------------------------------
+    const gutter = 20
+    const colW = (L.grid.w - gutter * (L.grid.cols - 1)) / L.grid.cols
+    g.strokeStyle = col(INK.lagoon, 0.2)
+    for (let c = 0; c < L.grid.cols; c++) {
+      const x0 = L.grid.x + c * (colW + gutter)
+      const p = pb(lb, c * 0.05, 0.5 + c * 0.05)
+      line(g, X(x0), fig.y, X(x0), fig.y + fig.h, p)
+      line(g, X(x0 + colW), fig.y + fig.h, X(x0 + colW), fig.y, p)
+      g.fillStyle = col(INK.lagoon, 0.035 * p)
+      g.fillRect(X(x0), fig.y, colW * U, fig.h * p)
     }
-    const fadeB = 1 - blast
-
-    titleCard(g, env, lb, 'DESIGN', NEON.cyan)
-
-    // --- the pen swoosh ------------------------------------------------------------
-    const pen = seg(lb, 0, 1.45, easeInOutCubic) * 3
-    const swA = (1 - seg(lb, 2.6, 3.6)) * fadeB
-    if (swA > 0.003 && pen > 0) {
-      const pts: [number, number][] = []
-      const N = 150
-      for (let i = 0; i <= N; i++) {
-        const s = (i / N) * pen
-        const k = Math.min(2, Math.floor(s))
-        const f = s - k
-        const c = SWOOSH[k]
-        pts.push(P(bez(c[0][0], c[1][0], c[2][0], c[3][0], f) * sx, bez(c[0][1], c[1][1], c[2][1], c[3][1], f)))
-      }
-      const grad = g.createLinearGradient(cx - 600 * U, 0, cx + 600 * U, 0)
-      grad.addColorStop(0, NEON.mint)
-      grad.addColorStop(1, NEON.cyan)
-      g.lineCap = 'round'
-      g.lineJoin = 'round'
-      for (const [w, a, s] of [
-        [10, 0.25, grad],
-        [3.5, 1, grad],
-        [1.2, 0.9, NEON.white],
-      ] as const) {
-        g.strokeStyle = s
-        g.globalAlpha = a * swA
-        g.lineWidth = w * Math.max(0.6, U * 1.4)
-        g.beginPath()
-        pts.forEach(([x, y], i) => (i ? g.lineTo(x, y) : g.moveTo(x, y)))
-        g.stroke()
-      }
-      g.globalAlpha = 1
-      // anchors + handles appear as the pen passes each one
-      SWOOSH.forEach((c, k) => {
-        const reached = clamp((pen - k) * 4)
-        if (reached <= 0) return
-        const [ax, ay] = P(c[0][0] * sx, c[0][1])
-        const [hx, hy] = P(c[1][0] * sx, c[1][1])
-        const hl = easeOutCubic(reached)
-        g.strokeStyle = col(NEON.white, 0.55 * swA)
-        g.lineWidth = 1
-        g.beginPath()
-        g.moveTo(ax, ay)
-        g.lineTo(lerp(ax, hx, hl), lerp(ay, hy, hl))
-        g.stroke()
-        g.fillStyle = col(NEON.white, swA)
-        g.beginPath()
-        g.arc(lerp(ax, hx, hl), lerp(ay, hy, hl), 4, 0, TAU)
-        g.fill()
-        const s = 10 * springOut((pen - k) * 0.4, 3, 0.4)
-        g.fillStyle = col('#05080D', swA)
-        g.fillRect(ax - s / 2, ay - s / 2, s, s)
-        g.strokeStyle = col(NEON.cyan, swA)
-        g.lineWidth = 1.5
-        g.strokeRect(ax - s / 2, ay - s / 2, s, s)
-      })
-      if (pen < 3) {
-        const [x, y] = pts[pts.length - 1]
-        glow(g, x, y, 60 * U, NEON.white, 0.8)
-      }
+    const baseline = 16 * U
+    g.strokeStyle = col(INK.ink, 0.045)
+    g.beginPath()
+    const bp = pb(lb, 0.3, 1.2)
+    for (let y = fig.y; y < fig.y + fig.h; y += baseline) {
+      g.moveTo(fig.x, y)
+      g.lineTo(fig.x + fig.w * bp, y)
     }
+    g.stroke()
+    typeText(g, `${L.grid.cols} COL · ${gutter} GUTTER`, X(L.grid.x), fig.y + fig.h - 10, pb(lb, 0.4, 0.9, (v) => v), 9, INK.lagoon)
 
-    // --- modular grid --------------------------------------------------------------
-    const gridP = seg(lb, 1.5, 2.05, easeOutExpo)
-    const gridA = gridP * (1 - seg(lb, 6.3, 6.8)) * 0.35
-    if (gridA > 0.003) {
-      g.strokeStyle = col(NEON.cyan, gridA)
-      g.lineWidth = 1
-      const gx = (G.grid.x0 + G.grid.x1) / 2
-      const gy = (G.grid.y0 + G.grid.y1) / 2
-      g.beginPath()
-      for (let c = 0; c <= G.cols; c++) {
-        const x = G.grid.x0 + c * G.cw
-        const [px, py0] = P(x, gy - ((G.grid.y1 - G.grid.y0) / 2 + 60) * gridP)
-        const [, py1] = P(x, gy + ((G.grid.y1 - G.grid.y0) / 2 + 60) * gridP)
-        g.moveTo(px, py0)
-        g.lineTo(px, py1)
-      }
-      for (let r = 0; r <= G.rows; r++) {
-        const y = G.grid.y0 + r * G.ch
-        const [px0, py] = P(gx - ((G.grid.x1 - G.grid.x0) / 2 + 60) * gridP, y)
-        const [px1] = P(gx + ((G.grid.x1 - G.grid.x0) / 2 + 60) * gridP, y)
-        g.moveTo(px0, py)
-        g.lineTo(px1, py)
-      }
-      g.stroke()
-    }
-
-    // --- shapes snap into the grid ---------------------------------------------------
-    const beat4 = springOut(t - 4 * B, 2.6, 0.4)
-    SHAPES.forEach((sh, i) => {
-      const p = springOut(t - sh.at * B, 3, 0.42)
-      if (p <= 0) return
-      const isHex = sh.kind === 6
-      let [x, y] = P(G.grid.x0 + (sh.cell[0] + 0.5) * G.cw, G.grid.y0 + (sh.cell[1] + 0.5) * G.ch)
-      let r = G.r * U * p
-      let rot = (1 - clamp(p)) * 1.6 + beat4 * (Math.PI / 2) * (isHex ? 1 / 3 : 1)
-      let a = 1
-      if (isHex) {
-        // the hexagon survives the blast, heads for centre and flies through the lens
-        const home = seg(lb, 6.6, 7.35, easeInOutCubic)
-        x = lerp(x, cx, home)
-        y = lerp(y, cy, home)
-        const zoom = Math.pow(seg(lb, 7.3, 8, easeInCubic), 2.2)
-        r *= 1 + zoom * 40
-        rot += zoom * 0.6
-      } else {
-        ;[x, y] = out(x, y, i)
-        rot += blast * 4
-        a = fadeB
-      }
-      const swatch = lb >= DESIGN_SWATCH_BEATS[i] ? SWATCHES[i] : NEON.cyan
-      g.globalAlpha = a
-      shapePath(g, sh.kind, x, y, r, rot)
-      g.fillStyle = col(swatch, 0.14)
-      g.fill()
-      g.strokeStyle = swatch
-      g.lineWidth = isHex && lb > 7.3 ? 4 : 2.5
-      g.stroke()
-      g.globalAlpha = 1
-
-      // bounding box + dimension on snap
-      const bb = clamp((lb - sh.at) / 0.1) * (1 - clamp((lb - sh.at - 0.55) / 0.3)) * fadeB
-      if (bb > 0.003 && !(isHex && lb > 6.6)) {
-        const s = G.r * U * 1.3
-        g.strokeStyle = col(NEON.white, 0.8 * bb)
-        g.lineWidth = 1
-        g.strokeRect(x - s, y - s, s * 2, s * 2)
-        g.fillStyle = col(NEON.white, bb)
-        for (const [hx, hy] of [[-1, -1], [1, -1], [1, 1], [-1, 1]])
-          g.fillRect(x + hx * s - 3, y + hy * s - 3, 6, 6)
-        g.font = font(10, 500, MONO)
-        g.textAlign = 'center'
-        g.fillStyle = col(NEON.cyan, bb)
-        g.fillText(`${Math.round(G.r * 2.6)} × ${Math.round(G.r * 2.6)}`, x, y + s + 16)
-        // smart guide to the previous shape
-        if (i > 0) {
-          const prev = SHAPES[i - 1]
-          const [px, py] = P(G.grid.x0 + (prev.cell[0] + 0.5) * G.cw, G.grid.y0 + (prev.cell[1] + 0.5) * G.ch)
-          g.strokeStyle = col(NEON.lime, 0.9 * bb)
-          g.setLineDash([4, 4])
-          g.beginPath()
-          g.moveTo(px, py)
-          g.lineTo(x, y)
-          g.stroke()
-          g.setLineDash([])
-        }
-      }
-      burst(g, x, y, t - sh.at * B - 0.08, { n: 12, seed: i + 40, speed: 420 * U, life: 0.45, size: 3, color: swatch, kind: 'streak' })
-    })
-
-    // --- type specimen: slams in, cycles faces ---------------------------------------
-    const spP = springOut(t - 4 * B, 2.8, 0.45)
-    const spA = spP > 0 ? clamp(spP * 3) * fadeB : 0
-    if (spA > 0.003) {
-      const face = FACES[lb < 5 ? 0 : lb < 5.5 ? 1 : lb < 6 ? 2 : 3]
-      let [x, y] = P(G.spec.x, G.spec.y)
-      ;[x, y] = out(x, y, 9)
-      const size = (env.portrait ? 300 : 400) * U
-      const base = y + size * 0.3
-      const s = lerp(1.5, 1, clamp(spP))
-      // metric lines
-      const lines = [
-        ['ascender', 0.8],
-        ['cap height', 0.7],
-        ['x-height', 0.47],
-        ['baseline', 0],
-        ['descender', -0.22],
-      ] as const
-      const lp = seg(lb, 4.2, 4.8, easeOutExpo)
-      g.font = font(10, 500, MONO)
-      g.textAlign = 'left'
+    // --- wireframe card -------------------------------------------------------------
+    const card: R = { x: X(L.card.x), y: Y(L.card.y), w: L.card.w * U, h: L.card.h * U }
+    const pad = 16 * U
+    const cp = pb(lb, 0.7, 1.4)
+    g.fillStyle = INK.paper
+    g.fillRect(card.x, card.y, card.w * clamp(cp * 1.4), card.h)
+    g.strokeStyle = INK.ink
+    rect(g, card.x, card.y, card.w, card.h, cp)
+    const img: R = { x: card.x + pad, y: card.y + pad, w: card.w - pad * 2, h: card.h * 0.42 }
+    const ip = pb(lb, 1.1, 1.8)
+    g.strokeStyle = col(INK.ink, 0.5)
+    rect(g, img.x, img.y, img.w, img.h, ip)
+    g.strokeStyle = col(INK.ink, 0.18)
+    line(g, img.x, img.y, img.x + img.w, img.y + img.h, pb(lb, 1.4, 1.9))
+    line(g, img.x + img.w, img.y, img.x, img.y + img.h, pb(lb, 1.5, 2.0))
+    const ty = img.y + img.h + 26 * U
+    typeText(g, 'CASE STUDY — 2026', img.x, ty, pb(lb, 1.6, 2.0, (v) => v), Math.max(8.5, 9.5 * U), INK.muted)
+    maskText(g, 'Considered interfaces', img.x, ty + 36 * U, Math.max(16, 28 * U), pb(lb, 1.7, 2.3))
+    g.strokeStyle = col(INK.ink, 0.14)
+    g.lineWidth = Math.max(3, 5 * U)
+    ;[0.92, 0.97, 0.58].forEach((w, i) => line(g, img.x, ty + (62 + i * 17) * U, img.x + img.w * w, ty + (62 + i * 17) * U, pb(lb, 1.9 + i * 0.12, 2.4 + i * 0.12)))
+    g.lineWidth = 1
+    const btn: R = { x: img.x, y: ty + 122 * U, w: 118 * U, h: 34 * U }
+    const bpp = pb(lb, 2.4, 2.9)
+    g.strokeStyle = INK.ink
+    rect(g, btn.x, btn.y, btn.w, btn.h, bpp)
+    if (bpp > 0.6) {
+      g.font = font(Math.max(9, 12 * U), 500, SANS)
+      g.fillStyle = INK.ink
+      g.textAlign = 'center'
       g.textBaseline = 'middle'
-      lines.forEach(([label, k], i) => {
-        const ly = base - k * size
-        const w = (env.portrait ? 380 : 330) * U
-        const pi = clamp(lp * 1.6 - i * 0.15)
-        g.fillStyle = col(i === 3 ? NEON.mint : NEON.cyan, (i === 3 ? 0.9 : 0.4) * spA)
-        g.fillRect(x - w, ly, w * 2 * pi, 1)
-        g.fillStyle = col(NEON.white, 0.55 * spA * pi)
-        g.textAlign = 'right'
-        g.fillText(label, x + w, ly - 8)
-      })
-      g.save()
-      g.translate(x, base)
-      g.scale(s, s)
-      g.globalAlpha = spA
-      g.font = font(size, face.weight, face.family, face.style)
-      g.textAlign = 'center'
-      g.textBaseline = 'alphabetic'
-      const grad = g.createLinearGradient(0, -size * 0.8, 0, 0)
-      grad.addColorStop(0, NEON.white)
-      grad.addColorStop(1, NEON.cyan)
-      g.fillStyle = grad
-      g.fillText('Aa', 0, 0)
-      g.restore()
-      g.globalAlpha = spA
-      g.font = font(11, 500, MONO)
-      g.textAlign = 'center'
-      g.fillStyle = NEON.mint
-      g.fillText(face.name.toUpperCase(), x, base + size * 0.36)
+      g.globalAlpha = clamp((bpp - 0.6) / 0.4)
+      g.fillText('View project →', btn.x + btn.w / 2, btn.y + btn.h / 2)
       g.globalAlpha = 1
     }
+    // redlines
+    dim(g, card.x, card.y - 12, card.x + card.w, card.y - 12, `${Math.round(L.card.w)}`, pb(lb, 2.8, 3.4))
+    dim(g, card.x + 3, img.y + img.h * 0.5, img.x - 3, img.y + img.h * 0.5, '16', pb(lb, 3.2, 3.7))
+    dim(g, img.x + img.w * 0.7, img.y + img.h + 3, img.x + img.w * 0.7, ty - 8, '24', pb(lb, 3.6, 4.1))
+    dim(g, btn.x + btn.w + 12, btn.y, btn.x + btn.w + 12, btn.y + btn.h, '36', pb(lb, 4.0, 4.5))
 
-    // --- palette ------------------------------------------------------------------------
-    SWATCHES.forEach((c, i) => {
-      const p = springOut(t - DESIGN_SWATCH_BEATS[i] * B, 3, 0.4)
-      if (p <= 0) return
-      let [x, y] = P(G.swatchX + (i - 2) * (env.portrait ? 120 : 92), G.swatchY)
-      ;[x, y] = out(x, y, i + 20)
-      const r = 26 * U * p
-      g.globalAlpha = fadeB
-      g.fillStyle = c
+    // --- bezier editor ----------------------------------------------------------------
+    const cv: R = { x: X(L.curve.x), y: Y(L.curve.y), w: L.curve.w * U, h: L.curve.h * U }
+    const ax = cv.x + 34 * U
+    const ay = cv.y + cv.h - 30 * U
+    const aw = cv.w - 60 * U
+    const ah = cv.h - 70 * U
+    g.fillStyle = INK.paper
+    g.fillRect(cv.x, cv.y, cv.w * pb(lb, 1.4, 2.0), cv.h)
+    g.strokeStyle = col(INK.ink, 0.6)
+    line(g, ax, ay, ax + aw, ay, pb(lb, 1.5, 2.1))
+    line(g, ax, ay, ax, ay - ah, pb(lb, 1.5, 2.0))
+    g.strokeStyle = col(INK.ink, 0.12)
+    g.setLineDash([2, 4])
+    line(g, ax, ay - ah, ax + aw, ay - ah, pb(lb, 1.8, 2.3))
+    line(g, ax + aw, ay, ax + aw, ay - ah, pb(lb, 1.8, 2.3))
+    g.setLineDash([])
+    for (let k = 0; k <= 10; k++) {
+      g.strokeStyle = col(INK.ink, 0.3)
+      line(g, ax + (aw * k) / 10, ay, ax + (aw * k) / 10, ay + (k % 5 ? 3 : 6), pb(lb, 1.8, 2.1))
+    }
+    typeText(g, 'PROGRESS', ax + aw, ay + 16, pb(lb, 1.9, 2.2, (v) => v), 9, INK.muted, 'right')
+    typeText(g, 'VALUE', ax, ay - ah - 14, pb(lb, 1.9, 2.2, (v) => v), 9, INK.muted)
+    const c = ctrl(lb)
+    const P0 = [ax, ay]
+    const P3 = [ax + aw, ay - ah]
+    const K1 = [ax + c.x1 * aw, ay - c.y1 * ah]
+    const K2 = [ax + c.x2 * aw, ay - c.y2 * ah]
+    const kp = pb(lb, 2.0, 2.8)
+    if (kp > 0) {
+      g.strokeStyle = INK.lagoon
+      g.lineWidth = 1.5
       g.beginPath()
-      g.arc(x, y, Math.max(0, r), 0, TAU)
-      g.fill()
-      g.font = font(9, 500, MONO)
-      g.textAlign = 'center'
-      g.fillStyle = col(NEON.white, 0.6 * clamp(p))
-      g.fillText(c.toUpperCase(), x, y + r + 14)
-      g.globalAlpha = 1
+      const n = Math.ceil(60 * kp)
+      for (let i = 0; i <= n; i++) {
+        const s = i / 60
+        const x = bez(P0[0], K1[0], K2[0], P3[0], s)
+        const y = bez(P0[1], K1[1], K2[1], P3[1], s)
+        if (i) g.lineTo(x, y)
+        else g.moveTo(x, y)
+      }
+      g.stroke()
+      g.lineWidth = 1
+      g.strokeStyle = col(INK.ink, 0.55)
+      line(g, P0[0], P0[1], K1[0], K1[1], clamp(kp * 1.5 - 0.3))
+      line(g, P3[0], P3[1], K2[0], K2[1], clamp(kp * 1.5 - 0.3))
+      for (const [x, y, fill] of [
+        [K1[0], K1[1], false],
+        [K2[0], K2[1], true],
+      ] as const) {
+        g.fillStyle = fill ? INK.lagoon : INK.paper
+        g.beginPath()
+        g.arc(x, y, 3.5, 0, TAU)
+        g.fill()
+        g.strokeStyle = INK.lagoon
+        g.stroke()
+      }
+      for (const [x, y] of [P0, P3]) {
+        g.fillStyle = INK.paper
+        g.fillRect(x - 3.5, y - 3.5, 7, 7)
+        g.strokeStyle = INK.ink
+        g.strokeRect(x - 3.5, y - 3.5, 7, 7)
+      }
+      // live readout + preview
+      const readout = env.portrait ? `(${f2(c.x1)}, ${f2(c.y1)}, ${f2(c.x2)}, ${f2(c.y2)})` : `cubic-bezier(${f2(c.x1)}, ${f2(c.y1)}, ${f2(c.x2)}, ${f2(c.y2)})`
+      typeText(g, readout, cv.x + 34 * U, cv.y + 12, clamp(kp * 2), Math.max(8.5, 10 * U), INK.lagoon)
+      const cyc = (lb % 1.5) / 1.5
+      const e = cubicBezierEase(c.x1, c.y1, c.x2, c.y2, clamp(cyc / 0.8))
+      const py = ay + 16
+      g.strokeStyle = col(INK.ink, 0.12)
+      line(g, ax, py, ax + aw * 0.55, py)
+      g.fillStyle = INK.lagoon
+      g.fillRect(ax + aw * 0.55 * e - 3, py - 3, 6, 6)
+    }
+
+    // --- type specimen -------------------------------------------------------------------
+    const sx = X(L.spec.x)
+    const size = L.spec.size * U
+    const base = Y(L.spec.y) + size * 0.3
+    const sw = L.spec.w * U
+    const sp = pb(lb, 3.2, 3.9)
+    const metrics = [
+      ['ASCENDER', 0.8],
+      ['CAP HEIGHT', 0.7],
+      ['X-HEIGHT', 0.45],
+      ['BASELINE', 0],
+      ['DESCENDER', -0.22],
+    ] as const
+    metrics.forEach(([label, k], i) => {
+      const y = base - k * size
+      g.strokeStyle = i === 3 ? INK.lagoon : col(INK.ink, 0.25)
+      line(g, sx, y, sx + sw, y, pb(lb, 3.2 + i * 0.08, 3.7 + i * 0.08))
+      typeText(g, label, sx + sw, y - 7, pb(lb, 3.4 + i * 0.08, 3.8 + i * 0.08, (v) => v), 8.5, INK.muted, 'right')
+    })
+    maskText(g, 'Aa', sx + 4, base, size, sp)
+    const scale = [
+      ['Display', 30, SERIF],
+      ['Title', 20, SERIF],
+      ['Body copy', 13, SANS],
+      ['CAPTION', 9.5, MONO],
+    ] as const
+    let yy = base + size * 0.42
+    scale.forEach(([label, s, fam], i) => {
+      const px = Math.max(8, s * U)
+      yy += px * 1.35
+      maskText(g, label, sx, yy, px, pb(lb, 4.1 + i * 0.12, 4.6 + i * 0.12), { family: fam, color: INK.ink2 })
+      typeText(g, `${s}`, sx + sw, yy - px * 0.35, pb(lb, 4.2 + i * 0.12, 4.5 + i * 0.12, (v) => v), 8.5, INK.muted, 'right')
     })
 
-    // --- the lens: hexagon interior becomes the floor ------------------------------------
-    const zoom = seg(lb, 7.55, 8)
-    if (zoom > 0) {
-      g.fillStyle = col('#07131A', zoom)
-      g.fillRect(0, 0, env.W, env.H)
-    }
+    // --- palette ---------------------------------------------------------------------------
+    const swatches = [INK.ink, INK.ocean, INK.lagoon, INK.moss, INK.fern, INK.paper2]
+    const s0x = X(L.swatch.x)
+    const s0y = Y(L.swatch.y)
+    swatches.forEach((c2, i) => {
+      const p = pb(lb, 4.8 + i * 0.12, 5.2 + i * 0.12, easeOutCubic)
+      if (p <= 0) return
+      const s = 26 * U
+      const x = s0x + i * (s + 26 * U)
+      g.fillStyle = c2
+      g.fillRect(x, s0y + s * (1 - p), s, s * p)
+      g.strokeStyle = col(INK.ink, 0.35)
+      g.strokeRect(x, s0y, s, s)
+      if (!env.portrait) typeText(g, c2.slice(1).toUpperCase(), x, s0y + s + 11, clamp(p * 2 - 1), 8, INK.muted)
+    })
   },
 
   hud(g, t, env) {
-    slate(g, env, t / B, '02', 'Design', NEON.cyan)
+    caption(g, env, t / B, 2, CHAPTERS[1])
   },
 }

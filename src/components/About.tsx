@@ -3,19 +3,19 @@ import Reveal from './Reveal'
 
 /*
  * One editorial statement, lit word by word as it scrolls through the
- * viewport — the reading pace is yours.
+ * viewport, then four facts on hairline rules.
  */
 
 const STATEMENT: { text: string; em?: boolean }[] = [
-  { text: "I'm a software engineer who designs. For ten years I've built enterprise systems in financial services, most recently a platform that retires decades of mainframe scripts. After hours I make games and music. Different mediums, one obsession:" },
-  { text: 'how things feel in motion.', em: true },
+  { text: "I'm a software engineer and designer. For ten years I've built enterprise systems in financial services, most recently SPARC, a platform that replaces decades of mainframe automation at U.S. Bank. Alongside that work I design interfaces, build game systems and compose music, held to one standard throughout:" },
+  { text: 'clear, precise, and built to last.', em: true },
 ]
 
 const FACTS = [
   { label: 'Based in', value: 'Hopkins, Minnesota' },
   { label: 'Currently', value: 'Software Engineer & AVP, U.S. Bank' },
-  { label: 'Experience', value: '10 years: enterprise, web, AI' },
-  { label: 'Off the clock', value: 'Godot games and music' },
+  { label: 'Experience', value: '10 years across enterprise, web and AI' },
+  { label: 'Also', value: 'Game systems in Godot, sound design' },
 ]
 
 export default function About() {

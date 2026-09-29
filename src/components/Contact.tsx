@@ -9,13 +9,14 @@ const LINKS = [
   { label: 'LinkedIn', href: 'https://www.linkedin.com/in/zachary-brewer-88653269/' },
 ]
 
-const HUES = ['#5CA8FF', '#3DE3F5', '#3DFFA8', '#B8FF5C']
-
 /*
- * The film's line, handed to the visitor: a 1-D wave-equation string you can
- * pluck by sweeping across it. With sound on, each pluck is a Karplus-Strong
- * note drawn from whatever chord the score is currently playing.
+ * Six hairline strings, handed to the visitor. Each is a 1-D wave equation;
+ * sweep across them to pluck. With sound on, each string plays a note from
+ * whatever chord the score is currently on (Karplus–Strong synthesis).
  */
+const STRINGS = 6
+const NAMES = ['E', 'A', 'D', 'G', 'B', 'E']
+
 function PluckString({ sound }: { sound: boolean }) {
   const canvasRef = useRef<HTMLCanvasElement>(null)
 
@@ -23,10 +24,10 @@ function PluckString({ sound }: { sound: boolean }) {
     const canvas = canvasRef.current
     const g = canvas?.getContext('2d')
     if (!canvas || !g) return
-    const reduce = window.matchMedia('(prefers-reduced-motion: reduce)').matches
-    const M = 160
-    const y = new Float32Array(M)
-    const v = new Float32Array(M)
+    const M = 120
+    const ys = Array.from({ length: STRINGS }, () => new Float32Array(M))
+    const vs = Array.from({ length: STRINGS }, () => new Float32Array(M))
+    const energy = new Float32Array(STRINGS)
     let W = 1
     let H = 1
     let dpr = 1
@@ -34,8 +35,13 @@ function PluckString({ sound }: { sound: boolean }) {
     let running = false
     let lastWall = 0
     let acc = 0
-    let lastPluck = 0
+    const lastPluck = new Float64Array(STRINGS)
     let prev: { x: number; y: number } | null = null
+
+    const gap = () => Math.min(18, H / (STRINGS + 3))
+    const baseY = (i: number) => H / 2 + (i - (STRINGS - 1) / 2) * gap()
+    const x0 = () => Math.max(20, W * 0.04)
+    const x1 = () => W - Math.max(20, W * 0.04)
 
     const resize = () => {
       W = canvas.clientWidth || 1
@@ -43,56 +49,64 @@ function PluckString({ sound }: { sound: boolean }) {
       dpr = Math.min(window.devicePixelRatio || 1, 2)
       canvas.width = Math.round(W * dpr)
       canvas.height = Math.round(H * dpr)
-      if (!running) draw(0)
+      if (!running) draw()
     }
 
-    const impulse = (x: number, strength: number) => {
-      const ix = (x / W) * (M - 1)
-      for (let i = 1; i < M - 1; i++) v[i] += strength * Math.exp(-(((i - ix) / 5) ** 2))
+    const impulse = (i: number, x: number, strength: number) => {
+      const ix = ((x - x0()) / (x1() - x0())) * (M - 1)
+      const v = vs[i]
+      for (let k = 1; k < M - 1; k++) v[k] += strength * Math.exp(-(((k - ix) / 4) ** 2))
+      energy[i] = 1
     }
 
     const step = () => {
-      for (let i = 1; i < M - 1; i++) v[i] += 0.24 * (y[i - 1] + y[i + 1] - 2 * y[i]) - 0.018 * v[i]
-      for (let i = 1; i < M - 1; i++) {
-        y[i] += v[i]
-        y[i] = Math.max(-H * 0.45, Math.min(H * 0.45, y[i]))
+      for (let i = 0; i < STRINGS; i++) {
+        const y = ys[i]
+        const v = vs[i]
+        for (let k = 1; k < M - 1; k++) v[k] += 0.24 * (y[k - 1] + y[k + 1] - 2 * y[k]) - 0.014 * v[k]
+        let e = 0
+        for (let k = 1; k < M - 1; k++) {
+          y[k] = Math.max(-gap() * 1.6, Math.min(gap() * 1.6, y[k] + v[k]))
+          e += Math.abs(y[k])
+        }
+        energy[i] = Math.min(1, e / (M * 1.5))
       }
     }
 
-    function draw(t: number) {
-      if (!g || !canvas) return
+    function draw() {
+      if (!g) return
       g.setTransform(dpr, 0, 0, dpr, 0, 0)
       g.clearRect(0, 0, W, H)
-      const mid = H / 2
-      const path = new Path2D()
-      for (let i = 0; i < M; i++) {
-        const s = i / (M - 1)
-        const idle = reduce ? 0 : Math.sin(Math.PI * s) * 4 * Math.sin(t * 0.9 + i * 0.05)
-        const px = s * W
-        const py = mid + y[i] + idle
-        if (i) path.lineTo(px, py)
-        else path.moveTo(px, py)
+      const a = x0()
+      const b = x1()
+      g.lineWidth = 1
+      for (let i = 0; i < STRINGS; i++) {
+        const y0 = baseY(i)
+        g.strokeStyle = `rgba(238,244,241,${(0.4 + 0.5 * energy[i]).toFixed(3)})`
+        g.beginPath()
+        for (let k = 0; k < M; k++) {
+          const x = a + ((b - a) * k) / (M - 1)
+          const y = y0 + ys[i][k]
+          if (k) g.lineTo(x, y)
+          else g.moveTo(x, y)
+        }
+        g.stroke()
+        g.fillStyle = 'rgba(238,244,241,0.4)'
+        g.font = '500 9px "Geist Mono", monospace'
+        g.textAlign = 'right'
+        g.textBaseline = 'middle'
+        g.fillText(NAMES[i], a - 8, y0)
       }
-      g.globalCompositeOperation = 'lighter'
-      g.lineCap = 'round'
-      g.lineJoin = 'round'
-      for (const [w, a, white] of [
-        [24, 0.05, 0],
-        [8, 0.14, 0],
-        [2.4, 0.9, 0.35],
-        [1, 0.75, 0.85],
-      ]) {
-        const gr = g.createLinearGradient(0, 0, W, 0)
-        HUES.forEach((c, i) => {
-          gr.addColorStop(0.06 + (i / 3) * 0.88, white > 0.5 ? `rgba(255,255,255,${a})` : hexA(c, a, white))
-        })
-        gr.addColorStop(0, 'rgba(0,0,0,0)')
-        gr.addColorStop(1, 'rgba(0,0,0,0)')
-        g.strokeStyle = gr
-        g.lineWidth = w
-        g.stroke(path)
-      }
-      g.globalCompositeOperation = 'source-over'
+      // nut and bridge
+      g.strokeStyle = 'rgba(238,244,241,0.55)'
+      const top = baseY(0) - 8
+      const bot = baseY(STRINGS - 1) + 8
+      g.beginPath()
+      g.moveTo(a, top)
+      g.lineTo(a, bot)
+      g.moveTo(b, top)
+      g.lineTo(b, bot)
+      g.stroke()
     }
 
     const frame = (wall: number) => {
@@ -104,7 +118,7 @@ function PluckString({ sound }: { sound: boolean }) {
         step()
         acc -= 1
       }
-      draw(wall / 1000)
+      draw()
     }
 
     const start = () => {
@@ -122,21 +136,21 @@ function PluckString({ sound }: { sound: boolean }) {
       const r = canvas.getBoundingClientRect()
       return { x: e.clientX - r.left, y: e.clientY - r.top }
     }
+    const strike = (i: number, x: number, vel: number, dir: number) => {
+      impulse(i, x, dir * (0.8 + vel * 0.12))
+      const now = performance.now()
+      if (now - lastPluck[i] > 60) {
+        pluck((i + 0.5) / STRINGS, Math.min(1, vel / 30))
+        lastPluck[i] = now
+      }
+    }
     const onMove = (e: PointerEvent) => {
       const p = local(e)
-      if (prev) {
-        const ix = Math.max(0, Math.min(M - 1, Math.round((p.x / W) * (M - 1))))
-        const lineY = H / 2 + y[ix]
-        const a = prev.y - lineY
-        const b = p.y - lineY
-        if (a * b < 0) {
-          const vel = Math.min(40, Math.max(2, Math.abs(p.y - prev.y)))
-          impulse(p.x, Math.sign(p.y - prev.y) * vel * 0.1)
-          const now = performance.now()
-          if (now - lastPluck > 70) {
-            pluck(p.x / W, vel / 40)
-            lastPluck = now
-          }
+      if (prev && p.x > x0() && p.x < x1()) {
+        const ix = Math.round(((p.x - x0()) / (x1() - x0())) * (M - 1))
+        for (let i = 0; i < STRINGS; i++) {
+          const ly = baseY(i) + (ys[i][Math.max(0, Math.min(M - 1, ix))] ?? 0)
+          if ((prev.y - ly) * (p.y - ly) < 0) strike(i, p.x, Math.min(40, Math.abs(p.y - prev.y)), Math.sign(p.y - prev.y))
         }
       }
       prev = p
@@ -146,8 +160,9 @@ function PluckString({ sound }: { sound: boolean }) {
     }
     const onDown = (e: PointerEvent) => {
       const p = local(e)
-      impulse(p.x, p.y < H / 2 ? 3.2 : -3.2)
-      pluck(p.x / W, 0.7)
+      let best = 0
+      for (let i = 1; i < STRINGS; i++) if (Math.abs(baseY(i) - p.y) < Math.abs(baseY(best) - p.y)) best = i
+      strike(best, p.x, 14, p.y < baseY(best) ? 1 : -1)
     }
 
     resize()
@@ -170,16 +185,10 @@ function PluckString({ sound }: { sound: boolean }) {
 
   return (
     <div className="pluck">
-      <p className="pluck-hint">Pluck the line{sound ? '' : ' · turn sound on to hear it'}</p>
+      <p className="pluck-hint">Six strings — sweep across to play{sound ? '' : ' · sound is off'}</p>
       <canvas ref={canvasRef} aria-hidden="true" />
     </div>
   )
-}
-
-function hexA(hex: string, a: number, white: number) {
-  const n = parseInt(hex.slice(1), 16)
-  const mix = (c: number) => Math.round(c + (255 - c) * white)
-  return `rgba(${mix((n >> 16) & 255)},${mix((n >> 8) & 255)},${mix(n & 255)},${a})`
 }
 
 export default function Contact({ onOpenResume }: { onOpenResume: () => void }) {
@@ -206,7 +215,7 @@ export default function Contact({ onOpenResume }: { onOpenResume: () => void }) 
           <p className="label">(04) Contact</p>
         </Reveal>
         <Reveal as="h2" variant="lines" className="contact-title">
-          <Lines lines={["Let's make something", <em key="m">that moves.</em>]} />
+          <Lines lines={["Let's build something", <em key="m">considered.</em>]} />
         </Reveal>
         <Reveal delay={0.12}>
           <div className="contact-row">
@@ -252,7 +261,7 @@ export default function Contact({ onOpenResume }: { onOpenResume: () => void }) 
 
       <footer className="footer container">
         <span>© {year} Zach Brewer</span>
-        <span>Designed and built by hand. The film up top is drawn live, frame by frame, with no video files.</span>
+        <span>Designed and built by Zach Brewer. The reel is rendered live in the browser.</span>
         <a className="link-u" href="#top">
           Back to top ↑
         </a>

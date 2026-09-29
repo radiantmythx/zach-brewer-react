@@ -1,40 +1,37 @@
-import { col, dot, font, glow, hits, kinetic, MONO, ring, slate, titleCard } from '../kit'
-import { clamp, easeInCubic, easeOutCubic, hash, lerp, noise1, seg, springOut, TAU } from '../math'
+import { B, caption, circle, col, line, lineMid, maskText, pb, typeText } from '../kit'
+import { clamp, easeOutCubic, noise1 } from '../math'
 import type { Env, Scene } from '../scene'
-import { BEAT, NEON } from '../timeline'
+import { CHAPTERS, INK } from '../timeline'
 
 /*
- * 04 MUSIC — beats 36–44.
- * The boss's shockwave becomes a radial EQ. Every beat throws a ring, a
- * mirrored waveform ribbons behind it, and a step sequencer plays the drum
- * pattern you're actually hearing (the score imports DRUMS). Then it all
- * implodes into a point for the logo.
+ * FIG. 04 SOUND — beats 32–40.
+ * A two-bar staff whose notes appear as the playhead reaches them — the
+ * same melody the synth plays — over a hairline waveform, beat rings, a
+ * step sequencer (the drum pattern you hear) and a spectrum of 96 lines.
  */
 
-const B = BEAT
-
 /** 16-step drum pattern, one bar. The soundtrack plays exactly this. */
-export const DRUMS: { name: string; color: string; steps: number[] }[] = [
-  { name: 'KICK', color: NEON.lime, steps: [0, 4, 8, 10, 12] },
-  { name: 'SNARE', color: NEON.cyan, steps: [4, 12] },
-  { name: 'HAT', color: NEON.blue, steps: [2, 6, 10, 14, 15] },
-  { name: 'PERC', color: NEON.mint, steps: [3, 7, 9, 13] },
+export const DRUMS: { name: string; steps: number[] }[] = [
+  { name: 'KICK', steps: [0, 4, 8, 10, 12] },
+  { name: 'SNARE', steps: [4, 12] },
+  { name: 'HAT', steps: [2, 6, 10, 14, 15] },
+  { name: 'PERC', steps: [3, 7, 9, 13] },
 ]
 
-const CHORDS = [
-  { at: 0, name: 'Am9' },
-  { at: 4, name: 'Fmaj7' },
+/** melody: [local beat, midi, length in beats] */
+export const MELODY: [number, number, number][] = [
+  [0.5, 76, 0.5], [1, 79, 0.5], [1.75, 81, 0.75], [2.5, 84, 0.5], [3, 81, 0.5], [3.5, 79, 0.5],
+  [4, 76, 0.5], [4.5, 74, 0.5], [5, 76, 0.5], [5.75, 79, 0.75], [6.5, 83, 0.5], [7, 81, 0.5], [7.5, 79, 0.5],
 ]
 
-function eqColor(i: number, n: number) {
-  const k = (i / n) * 4
-  return [NEON.blue, NEON.cyan, NEON.mint, NEON.lime][Math.floor(k) % 4]
-}
+const STEP_OF: Record<number, number> = { 0: 0, 2: 1, 4: 2, 5: 3, 7: 4, 9: 5, 11: 6 }
+/** diatonic staff step (C major / A minor) relative to E4 on the bottom line */
+const staffStep = (m: number) => Math.floor(m / 12) * 7 + (STEP_OF[m % 12] ?? 0) - (5 * 7 + 2)
 
 function layout(env: Env) {
   return env.portrait
-    ? { r0: 120, seqY: 470, seqW: 660, cell: 40, shift: 50 }
-    : { r0: 150, seqY: 318, seqW: 900, cell: 34, shift: 0 }
+    ? { x0: -330, x1: 330, staffY: -290, waveY: -125, seqY: -30, specY: 370, ringR: 110 }
+    : { x0: -580, x1: 580, staffY: -160, waveY: 5, seqY: 78, specY: 250, ringR: 150 }
 }
 
 export const musicScene: Scene = {
@@ -42,186 +39,158 @@ export const musicScene: Scene = {
 
   fx(t, _env, fx) {
     const lb = t / B
-    if (lb < -0.2 || lb > 8.2) return
-    const beatsIn = [0, 1, 2, 3, 4, 5, 6]
-    fx.flash += hits(lb, [0], 0.35, 12) + hits(lb, [4], 0.15, 14)
-    fx.zoom *= 1 + hits(lb, beatsIn, 0.025, 10) - 0.05 * seg(lb, 6.5, 7.9, easeInCubic)
-    fx.shake += hits(lb, beatsIn, 3, 12)
-    fx.bloom += 0.5 * seg(lb, 7, 7.9)
+    fx.zoom *= 1 + 0.006 * Math.exp(-6 * (lb % 1)) + 0.015 * clamp(lb / 8)
   },
 
   draw(g, t, env) {
     const lb = t / B
-    if (lb < 0 || lb >= 8) return
-    const { cx, cy, U } = env
+    const { U, cx, cy } = env
     const L = layout(env)
+    const X = (x: number) => cx + x * U
+    const Y = (y: number) => cy + y * U
     const kick = Math.exp(-6 * (lb % 1))
-    const enter = springOut(t, 2.4, 0.5)
-    const implode = seg(lb, 6.4, 7.8, easeInCubic)
-    const live = clamp(enter) * (1 - implode)
+    g.lineWidth = 1
+    const width = L.x1 - L.x0
+    const xAt = (beat: number) => X(L.x0 + 40 + (beat / 8) * (width - 50))
 
-    titleCard(g, env, lb, 'SOUND', NEON.lime)
-    glow(g, cx, cy, 720 * U, NEON.mint, 0.1 + 0.08 * kick)
-    glow(g, cx, cy, 420 * U, NEON.blue, 0.12)
-
-    // --- waveform ribbons, mirrored -----------------------------------------------
-    const wa = seg(lb, 0.4, 1.2) * (1 - implode)
-    if (wa > 0.003) {
-      for (const [k, c, amp] of [
-        [0, NEON.blue, 1],
-        [1, NEON.mint, 0.7],
-      ] as const) {
-        for (const sign of [1, -1]) {
-          g.strokeStyle = col(c, 0.55 * wa)
-          g.lineWidth = k ? 1.5 : 2
-          g.beginPath()
-          for (let x = 0; x <= env.W; x += 6) {
-            const s = x / env.W
-            const w = Math.pow(Math.sin(Math.PI * s), 1.2)
-            const y =
-              (Math.sin(s * 22 + lb * 5 + k) * 0.6 + Math.sin(s * 57 - lb * 7) * 0.25 + noise1(s * 30 + lb * 4 + k * 9) * 0.35) *
-              (60 + 60 * kick) *
-              U *
-              amp *
-              w
-            const yy = cy + sign * Math.abs(y)
-            if (x === 0) g.moveTo(x, yy)
-            else g.lineTo(x, yy)
-          }
-          g.stroke()
-        }
-      }
-    }
-
-    // --- beat rings -------------------------------------------------------------------------
-    for (let b = 0; b < 7; b++) {
+    // --- beat rings behind everything ---------------------------------------------------
+    for (let b = 0; b < 8; b++) {
       const dt = (lb - b) * B
-      if (dt < 0 || dt > 1.1) continue
-      const p = easeOutCubic(dt / 1.1)
-      ring(g, cx, cy, (L.r0 + p * 620) * U, 3 * (1 - p) + 0.5, col(b % 2 ? NEON.cyan : NEON.lime, 0.7 * (1 - p) * (1 - implode)))
+      if (dt < 0 || dt > 1) continue
+      const p = easeOutCubic(dt)
+      g.strokeStyle = col(INK.fern, 0.25 * (1 - p))
+      circle(g, cx, Y(L.waveY), (L.ringR + p * 260) * U)
     }
 
-    // --- radial EQ ----------------------------------------------------------------------------------
-    const n = 72
-    const r0 = L.r0 * U * (1 - implode)
-    g.lineCap = 'round'
-    for (let i = 0; i < n; i++) {
-      const j = Math.min(i, n - i)
-      const a = (i / n) * TAU - Math.PI / 2 + lb * 0.12
-      const shape = Math.pow(Math.abs(Math.sin(j * 0.23 + lb * 1.7)), 2) * 0.6 + noise1(j * 0.7 + lb * 3) * 0.25 + 0.3
-      const len = (26 + 190 * shape * (0.45 + 0.55 * kick)) * U * live
-      if (len <= 0.5) continue
-      g.strokeStyle = eqColor(i, n)
-      g.lineWidth = Math.max(1.5, 5 * U)
-      g.beginPath()
-      g.moveTo(cx + Math.cos(a) * (r0 + 6 * U), cy + Math.sin(a) * (r0 + 6 * U))
-      g.lineTo(cx + Math.cos(a) * (r0 + len), cy + Math.sin(a) * (r0 + len))
-      g.stroke()
+    // --- staff ---------------------------------------------------------------------------
+    const gap = 15 * U
+    const bottom = Y(L.staffY)
+    g.strokeStyle = col(INK.ink, 0.45)
+    for (let k = 0; k < 5; k++) lineMid(g, X(L.x0), bottom - k * gap, X(L.x1), bottom - k * gap, pb(lb, k * 0.06, 0.6 + k * 0.06))
+    g.strokeStyle = col(INK.ink, 0.6)
+    for (const b of [0, 4, 8]) {
+      const x = b === 0 ? X(L.x0) : xAt(b) - 8
+      line(g, x, bottom, x, bottom - gap * 4, pb(lb, 0.5, 0.8))
     }
-    ring(g, cx, cy, r0, 2, col(NEON.white, 0.7 * live))
+    maskText(g, '4', X(L.x0) + 10, bottom - gap * 2 + 2, gap * 2.6, pb(lb, 0.5, 0.9))
+    maskText(g, '4', X(L.x0) + 10, bottom + 2, gap * 2.6, pb(lb, 0.6, 1.0))
 
-    // --- centre: BPM, chord names ---------------------------------------------------------------------
-    if (live > 0.01) {
-      const s = (1 + 0.08 * kick) * live
+    // notes
+    for (const [b, m] of MELODY) {
+      if (lb < b) continue
+      const step = staffStep(m)
+      const x = xAt(b)
+      const y = bottom - (step * gap) / 2
+      const pop = easeOutCubic(clamp((lb - b) / 0.18))
+      const playing = lb - b < 0.5
+      // ledger lines above the staff
+      g.strokeStyle = col(INK.ink, 0.45)
+      for (let s = 10; s <= step; s += 2) line(g, x - 10 * U, bottom - (s * gap) / 2, x + 10 * U, bottom - (s * gap) / 2)
       g.save()
-      g.translate(cx, cy)
-      g.scale(s, s)
-      kinetic(g, '128', 0, -8 * U, { size: 78 * U, weight: 900, fill: NEON.white })
-      g.font = font(Math.max(9, 13 * U), 500, MONO)
-      g.textAlign = 'center'
-      g.fillStyle = NEON.lime
-      g.fillText('BPM', 0, 44 * U)
-      g.restore()
-      for (const c of CHORDS) {
-        const dt = lb - c.at
-        if (dt < 0 || dt >= 4) continue
-        const p = springOut(dt * B, 3, 0.45)
-        kinetic(g, c.name, cx, cy - (L.r0 + 250) * U, {
-          size: 56 * U,
-          weight: 800,
-          fill: NEON.white,
-          alpha: clamp(p * 2) * (1 - seg(dt, 3.3, 4)) * (1 - implode),
-          split: 8 * Math.exp(-dt * 6),
-          letter: (i) => {
-            const q = springOut(dt * B - i * 0.03, 3.5, 0.45)
-            return { y: (1 - q) * -60 * U, sx: q, sy: q }
-          },
-        })
-      }
-    }
-
-    // --- note heads thrown off the ring on melody notes ---------------------------------------------------
-    for (let k = 0; k < 14; k++) {
-      const at = 0.5 + k * 0.5 + (k % 3 === 1 ? 0.25 : 0)
-      const dt = (lb - at) * B
-      if (dt < 0 || dt > 1.2) continue
-      const a = hash(k * 3.3) * TAU
-      const d = (L.r0 + 40 + easeOutCubic(dt / 1.2) * 420) * U
-      const x = cx + Math.cos(a) * d
-      const y = cy + Math.sin(a) * d
-      g.globalAlpha = (1 - dt / 1.2) * (1 - implode)
-      dot(g, x, y, 7 * U, NEON.white)
-      g.strokeStyle = NEON.white
-      g.lineWidth = 2
+      g.translate(x, y)
+      g.rotate(-0.35)
+      g.scale(pop, pop)
+      g.fillStyle = playing ? INK.fern : INK.ink
       g.beginPath()
-      g.moveTo(x + 6 * U, y)
-      g.lineTo(x + 6 * U, y - 34 * U)
-      g.stroke()
-      g.globalAlpha = 1
+      g.ellipse(0, 0, 6.5 * U + 1.5, 4.6 * U + 1, 0, 0, Math.PI * 2)
+      g.fill()
+      g.restore()
+      g.strokeStyle = playing ? INK.fern : INK.ink
+      const up = step < 4
+      line(g, x + (up ? 6 : -6) * U, y, x + (up ? 6 : -6) * U, y + (up ? -1 : 1) * 36 * U, pop)
+    }
+    // playhead
+    if (lb < 8) {
+      const px = xAt(lb)
+      g.strokeStyle = INK.fern
+      line(g, px, bottom + 12, px, bottom - gap * 4 - 12, pb(lb, 0.3, 0.6))
     }
 
-    // --- step sequencer ---------------------------------------------------------------------------------------
-    const cell = L.cell * U
-    const gap = cell * 0.28
-    const gridW = 16 * cell + 15 * gap
-    const scale = Math.min(1, (L.seqW * U) / gridW)
-    const cw = cell * scale
-    const gw = gap * scale
-    const x0 = cx - (16 * cw + 15 * gw) / 2 + L.shift * U
-    const y0 = cy + L.seqY * U - (4 * cw + 3 * gw) / 2
-    const step = Math.floor(lb * 4) % 16
-    const seqIn = seg(lb, 1, 1.8)
-    if (seqIn > 0) {
-      g.font = font(9, 500, MONO)
-      g.textAlign = 'right'
-      g.textBaseline = 'middle'
+    // --- waveform -----------------------------------------------------------------------------
+    const wa = pb(lb, 0.5, 1.5)
+    if (wa > 0) {
+      const wy = Y(L.waveY)
+      for (const [c, a, amp, ph] of [
+        [INK.ink, 0.9, 1, 0],
+        [INK.sage, 0.9, -0.6, 1.7],
+      ] as const) {
+        g.strokeStyle = col(c, a)
+        g.beginPath()
+        const n = 220
+        for (let i = 0; i <= n * wa; i++) {
+          const s = i / n
+          const x = X(L.x0) + s * width * U
+          const win = Math.pow(Math.sin(Math.PI * s), 1.4)
+          const v =
+            Math.sin(s * 34 + lb * 6 + ph) * 0.55 + Math.sin(s * 81 - lb * 9) * 0.25 + noise1(s * 40 + lb * 5 + ph) * 0.3
+          const y = wy + v * (26 + 34 * kick) * U * amp * win
+          if (i === 0) g.moveTo(x, y)
+          else g.lineTo(x, y)
+        }
+        g.stroke()
+      }
+      g.strokeStyle = col(INK.ink, 0.15)
+      line(g, X(L.x0), wy, X(L.x1), wy, wa)
+    }
+
+    // --- sequencer --------------------------------------------------------------------------------
+    const sq = pb(lb, 1.2, 2.0)
+    if (sq > 0) {
+      const cell = (env.portrait ? 21 : 15) * U
+      const gp = cell * 0.35
+      const sx = X(L.x0) + (env.portrait ? 44 : 60)
+      const sy = Y(L.seqY)
+      const step = Math.floor(lb * 4) % 16
       DRUMS.forEach((row, r) => {
-        const y = y0 + r * (cw + gw)
-        g.fillStyle = col(row.color, 0.7 * seqIn * (1 - implode))
-        g.fillText(row.name, x0 - 12, y + cw / 2)
+        const y = sy + r * (cell + gp)
+        typeText(g, row.name, sx - 12, y + cell / 2, sq, 8.5, INK.muted, 'right')
         for (let s = 0; s < 16; s++) {
-          const appear = clamp((seqIn * 1.6 - (s + r) / 22) * 3)
+          const appear = clamp(sq * 1.5 - (s + r) / 24)
           if (appear <= 0) continue
-          let x = x0 + s * (cw + gw)
-          let y2 = y
-          if (implode > 0) {
-            x = lerp(x, cx - cw / 2, implode)
-            y2 = lerp(y2, cy - cw / 2, implode)
-          }
+          const x = sx + s * (cell + gp) + Math.floor(s / 4) * gp
           const on = row.steps.includes(s)
-          const lit = on && s === step && lb < 6.6
-          const sz = cw * appear * (1 - implode * 0.8)
-          g.fillStyle = lit ? NEON.white : on ? col(row.color, 0.55) : col(NEON.white, 0.07)
-          g.fillRect(x + (cw - sz) / 2, y2 + (cw - sz) / 2, sz, sz)
-          if (lit) glow(g, x + cw / 2, y2 + cw / 2, cw * 2.2, row.color, 0.8)
+          const lit = on && s === step && lb < 7.8
+          g.strokeStyle = col(INK.ink, 0.35)
+          g.strokeRect(x, y, cell, cell * appear)
+          if (on) {
+            g.fillStyle = lit ? INK.fern : col(INK.ink, 0.75)
+            g.fillRect(x + 2, y + 2, cell - 4, (cell - 4) * appear)
+          }
         }
       })
-      // playhead
-      if (lb < 6.6) {
-        const px = x0 + step * (cw + gw) + cw / 2
-        g.fillStyle = col(NEON.white, 0.5 * seqIn)
-        g.fillRect(px - 1, y0 - 10, 2, 4 * cw + 3 * gw + 20)
-      }
+      // chord notes to the right
+      const ax = env.portrait ? X(L.x0) + 60 : X(120)
+      const ay = env.portrait ? sy + 4 * (cell + gp) + 24 : sy + 6
+      const chord = lb < 4 ? ['Am9', 'A · C · E · G · B'] : ['Fmaj7', 'F · A · C · E']
+      maskText(g, chord[0], ax, ay + 18, 26 * U + 6, pb(lb % 4, 0.05, 0.4))
+      typeText(g, chord[1], ax, ay + 34, pb(lb % 4, 0.2, 0.6, (v) => v), 9.5, INK.muted)
+      typeText(g, '128 BPM · 4/4 · A MINOR', ax, ay + 50, pb(lb, 1.6, 2.2, (v) => v), 9.5, INK.fern)
     }
 
-    // --- implosion point ----------------------------------------------------------------------------------------
-    if (implode > 0) {
-      glow(g, cx, cy, 200 * U * implode, NEON.white, 0.7 * implode)
-      dot(g, cx, cy, lerp(2, 10, implode) * U, NEON.white)
+    // --- spectrum ------------------------------------------------------------------------------------
+    const spc = pb(lb, 1.0, 1.8)
+    if (spc > 0) {
+      const base = Y(L.specY)
+      const n = 96
+      g.beginPath()
+      for (let i = 0; i < n; i++) {
+        const s = i / (n - 1)
+        const x = X(L.x0) + s * width * U
+        const shape = Math.pow(1 - s, 0.6) * (0.55 + 0.45 * noise1(i * 0.45 + lb * 3.5)) + 0.08
+        const h = (8 + (env.portrait ? 70 : 100) * shape * (0.5 + 0.5 * kick)) * U * spc
+        g.moveTo(x, base)
+        g.lineTo(x, base - h)
+      }
+      g.strokeStyle = col(INK.moss, 0.85)
+      g.stroke()
+      g.strokeStyle = col(INK.ink, 0.4)
+      line(g, X(L.x0), base + 0.5, X(L.x1), base + 0.5, spc)
+      typeText(g, '20 HZ', X(L.x0), base + 12, spc, 8.5, INK.muted)
+      typeText(g, '20 KHZ', X(L.x1), base + 12, spc, 8.5, INK.muted, 'right')
     }
   },
 
   hud(g, t, env) {
-    slate(g, env, t / B, '04', 'Music', NEON.lime)
+    caption(g, env, t / B, 4, CHAPTERS[3])
   },
 }

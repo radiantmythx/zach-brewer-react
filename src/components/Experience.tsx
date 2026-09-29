@@ -128,7 +128,7 @@ export default function Experience() {
             <p className="label">(03) Experience</p>
           </Reveal>
           <Reveal as="h2" variant="lines" className="display">
-            <Lines lines={['Ten years', <em key="s">of shipping.</em>]} />
+            <Lines lines={['Ten years in', <em key="s">enterprise engineering.</em>]} />
           </Reveal>
         </header>
 
@@ -137,8 +137,8 @@ export default function Experience() {
             <p className="xp-feature-kicker">Currently building · U.S. Bank</p>
             <h3 className="xp-feature-title">SPARC</h3>
             <p className="xp-feature-copy">
-              A microservices platform that takes decades of mainframe scripts and manual work and turns them into
-              one modern, observable system.
+              A microservices platform that consolidates decades of mainframe scripts and manual processes into a
+              single modern, observable system.
             </p>
           </div>
           <dl className="stats">

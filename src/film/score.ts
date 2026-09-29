@@ -1,18 +1,18 @@
 import { chordAt, CHORDS, IDLE_CHORDS, IDLE_LEN, mtof, REEL_CHORDS } from './harmony'
 import { hash } from './math'
-import { CODE_TOKEN_BEATS } from './scenes/code'
-import { DESIGN_SNAP_BEATS, DESIGN_SWATCH_BEATS } from './scenes/design'
-import { GAME_BEATS, GAME_BOLT_BEATS, GAME_HIT_BEATS, GAME_LOOT_BEATS } from './scenes/game'
-import { DRUMS } from './scenes/music'
-import { RESOLVE_PIECE_BEATS } from './scenes/resolve'
+import { CODE_RETIRE_BEAT, CODE_TYPE_BEATS } from './scenes/code'
+import { DESIGN_EVENT_BEATS } from './scenes/design'
+import { GAME_CUTS, GAME_HIT_BEATS, GAME_SHATTER } from './scenes/game'
+import { DRUMS, MELODY } from './scenes/music'
+import { RESOLVE_STROKE_BEATS } from './scenes/resolve'
 import { BAR, BEAT, REEL_END, REVEAL_BEAT, SNAP_BEAT } from './timeline'
 
 /*
  * The reel's soundtrack, synthesized live with Web Audio — no samples, no
- * files. Every hit is derived from the same beat times the picture uses
- * (token slams, shape snaps, sword hits, bolts, the boss, the logo snap), and
- * the music chapter's drums are literally the on-screen sequencer pattern.
- * After the reel, a quiet ambient loop plays for as long as sound is on.
+ * files. It follows the drawing: soft ticks for keystrokes and line work,
+ * plucks for design elements, a quick minimal groove under the simulation,
+ * the sequencer's pattern and the staff's melody in the sound figure, and a
+ * quiet chord bloom when the mark completes. Idle: a slow ambient loop.
  */
 
 type Kind =
@@ -34,139 +34,93 @@ function buildReel(): Ev[] {
   const add = (beat: number, k: Kind, o: Omit<Ev, 't' | 'k'> = {}) => ev.push({ t: beat * BEAT, k, ...o })
   const chord = (bar: number) => CHORDS[REEL_CHORDS[bar]]
 
-  // harmony bed
-  const padLook: Record<number, [number, number]> = { 1: [0.5, 700], 2: [0.45, 900], 3: [0.45, 900], 4: [0.55, 1100], 5: [0.55, 1100], 6: [0.4, 1300], 7: [0.4, 1300], 8: [0.45, 1100], 9: [0.7, 1800], 10: [0.7, 1800] }
-  for (const [bar, [gain, cutoff]] of Object.entries(padLook)) add(Number(bar) * 4, 'pad', { notes: chord(Number(bar)).notes, dur: BAR + 0.1, gain, cutoff })
+  // harmony bed, one chord per bar
+  const bed: [number, number, number][] = [
+    [0, 0.5, 650], [1, 0.5, 700], [2, 0.4, 900], [3, 0.4, 900], [4, 0.45, 1100], [5, 0.45, 1100],
+    [6, 0.35, 1300], [7, 0.35, 1300], [8, 0.6, 1700], [9, 0.6, 1700], [10, 0.45, 900],
+  ]
+  for (const [bar, gain, cutoff] of bed) add(bar * 4, 'pad', { notes: chord(bar).notes, dur: BAR + 0.1, gain, cutoff })
 
-  const groove = (from: number, to: number, o: { clap?: boolean; hats?: 8 | 16; bass?: boolean; kick?: boolean } = {}) => {
+  const groove = (from: number, to: number, o: { clap?: boolean; hats?: 8 | 16; kick?: number; bass?: boolean } = {}) => {
     for (let b = from; b < to; b++) {
-      if (o.kick !== false) add(b, 'kick', { gain: 0.8 })
-      if (o.clap !== false && b % 2 === 1) add(b, 'clap', { gain: 0.8 })
-      if ((o.hats ?? 8) === 8) add(b + 0.5, 'hat', { gain: 0.7 })
-      else for (let s = 0; s < 4; s++) add(b + s / 4, 'hat', { gain: s === 2 ? 0.7 : s % 2 ? 0.45 : 0.3 })
+      add(b, 'kick', { gain: o.kick ?? 0.55 })
+      if (o.clap && b % 2 === 1) add(b, 'clap', { gain: 0.45 })
+      if ((o.hats ?? 8) === 8) add(b + 0.5, 'hat', { gain: 0.5 })
+      else for (let s = 0; s < 4; s++) add(b + s / 4, 'hat', { gain: s === 2 ? 0.55 : 0.3 })
       if (o.bass !== false) {
         const c = chord(Math.floor(b / 4))
-        add(b, 'bass', { midi: c.bass - 12, dur: BEAT * 0.45, gain: 0.9 })
-        add(b + 0.5, 'bass', { midi: c.bass - 12 + (b % 2 ? 12 : 7), dur: BEAT * 0.4, gain: 0.7 })
+        add(b, 'bass', { midi: c.bass - 12, dur: BEAT * 0.4, gain: 0.6 })
+        if (b % 2) add(b + 0.5, 'bass', { midi: c.bass - 12 + 12, dur: BEAT * 0.3, gain: 0.45 })
       }
     }
   }
 
-  // --- COLD OPEN ---------------------------------------------------------------------
-  add(0, 'riser', { dur: BEAT * 0.95, gain: 0.6 })
-  add(1, 'impact', { gain: 0.8 })
-  add(1, 'stab', { notes: [57, 60, 64], gain: 0.7 })
-  add(2, 'impact', { gain: 0.65 })
-  add(2, 'stab', { notes: [57, 60, 64], gain: 0.55 })
-  add(3, 'whoosh', { dur: 0.25, gain: 0.5 })
-  add(3, 'blip', { midi: 88, gain: 0.5 })
-  add(3.5, 'impact', { gain: 1 })
-  add(3.5, 'drop', { dur: BEAT * 2, gain: 0.8 })
-  add(3.5, 'stab', { notes: [45, 52, 57, 60], gain: 0.9 })
-  groove(4, 8, { hats: 8 })
-  add(7.25, 'riser', { dur: BEAT * 0.75, gain: 0.5 })
-  add(7.5, 'whoosh', { dur: 0.35, gain: 0.8 })
+  // --- INDEX -----------------------------------------------------------------------------
+  for (let i = 0; i < 8; i++) add(0.25 + i * 0.125, 'hat', { gain: 0.25 + i * 0.03 })
+  add(1.1, 'bell', { midi: 76, gain: 0.45, dur: 1.6 })
+  add(1.45, 'bell', { midi: 81, gain: 0.4, dur: 1.6 })
+  add(0.9, 'whoosh', { dur: BEAT * 3.6, gain: 0.25 })
+  ;[72, 76, 79, 83].forEach((m, i) => add(3.0 + i * 0.25, 'arp', { midi: m, gain: 0.8 }))
+  add(5.4, 'riser', { dur: BEAT * 1.8, gain: 0.25 })
+  add(7.5, 'kick', { gain: 0.45 })
 
-  // --- 01 PROGRAMMING --------------------------------------------------------------------
-  add(8, 'impact', { gain: 0.6 })
-  groove(8, 16, { hats: 16 })
-  CODE_TOKEN_BEATS.forEach((b, i) => {
-    add(8 + b, 'blip', { midi: [72, 74, 76, 79, 81, 79, 84, 86, 88, 91][i], gain: 0.6 })
-    add(8 + b, 'crunch', { gain: 0.35 })
+  // --- 01 ENGINEERING ---------------------------------------------------------------------------
+  groove(8, 16, { hats: 8 })
+  CODE_TYPE_BEATS.forEach((b) => add(8 + b, 'blip', { midi: 96 + Math.floor(hash(b * 13) * 5), gain: 0.12 }))
+  add(8 + CODE_RETIRE_BEAT, 'bell', { midi: 84, gain: 0.45, dur: 1.4 })
+  add(8 + CODE_RETIRE_BEAT, 'crunch', { gain: 0.3 })
+
+  // --- 02 INTERFACE DESIGN ------------------------------------------------------------------------
+  groove(16, 24, { hats: 8, clap: true })
+  DESIGN_EVENT_BEATS.forEach((b, i) => {
+    const c = chord(Math.floor((16 + b) / 4))
+    add(16 + b, 'arp', { midi: c.notes[i % 4] + 12, gain: 0.7 })
   })
-  add(12, 'riser', { dur: BEAT * 0.6, gain: 0.35 })
-  add(12, 'bell', { midi: 88, gain: 0.5, dur: 1.2 })
-  add(12.5, 'whoosh', { dur: 0.3, gain: 0.6 })
-  add(12.75, 'whoosh', { dur: 0.3, gain: 0.6 })
-  add(13, 'impact', { gain: 0.5 })
-  add(13.5, 'impact', { gain: 0.55 })
-  for (let i = 0; i < 14; i++) add(13.6 + i * 0.0625, 'blip', { midi: 60 + Math.floor(hash(i * 3.3) * 36), gain: 0.25 })
-  add(14.5, 'riser', { dur: BEAT * 1.4, gain: 0.55 })
 
-  // --- 02 DESIGN -----------------------------------------------------------------------------
-  add(16, 'impact', { gain: 0.6 })
-  add(16, 'whoosh', { dur: BEAT * 1.4, gain: 0.6 })
-  groove(16, 24, { hats: 8 })
-  DESIGN_SNAP_BEATS.forEach((b, i) => add(16 + b, 'bell', { midi: [81, 84, 88, 91][i], gain: 0.6, dur: 1.4 }))
-  add(20, 'impact', { gain: 0.55 })
-  add(20, 'stab', { notes: [60, 64, 67, 71], gain: 0.6 })
-  for (const b of [21, 21.5, 22]) add(b, 'blip', { midi: 96, gain: 0.3 })
-  DESIGN_SWATCH_BEATS.forEach((b, i) => add(16 + b, 'arp', { midi: [72, 76, 79, 83, 86][i], gain: 1 }))
-  add(22.5, 'crash', { gain: 0.5 })
-  add(22.5, 'whoosh', { dur: 0.4, gain: 0.7 })
-  add(23.3, 'riser', { dur: BEAT * 0.7, gain: 0.6 })
+  // --- 03 GAME SYSTEMS -------------------------------------------------------------------------------
+  groove(24, 32, { hats: 16, clap: true, kick: 0.6 })
+  for (let s = 0; s < 28; s++) {
+    const beat = 24 + s * 0.25
+    add(beat, 'arp', { midi: chord(Math.floor(beat / 4)).notes[[0, 2, 1, 3][s % 4]] + 12, gain: 0.35 })
+  }
+  GAME_HIT_BEATS.forEach((b) => add(24 + b, 'blip', { midi: 88 + Math.floor(hash(b * 7) * 8), gain: 0.14 }))
+  for (const b of [1, 2, 3, 4, 5]) add(24 + b, 'zap', { gain: 0.25 })
+  GAME_CUTS.forEach((b) => {
+    add(24 + b, 'whoosh', { dur: 0.12, gain: 0.5 })
+    add(24 + b, 'crunch', { gain: 0.35 })
+  })
+  add(24 + GAME_SHATTER, 'shimmer', { gain: 0.5 })
+  add(24 + GAME_SHATTER, 'crash', { gain: 0.25 })
 
-  // --- 03 GAME DEV ---------------------------------------------------------------------------------
-  const G = (b: number) => 24 + b
-  add(G(0), 'impact', { gain: 0.8 })
-  add(G(0), 'whoosh', { dur: 0.35, gain: 0.7 })
-  add(G(GAME_BEATS.spawn1), 'portal', { gain: 0.6 })
-  add(G(GAME_BEATS.spawn2), 'portal', { gain: 0.6 })
-  add(G(GAME_BEATS.spawn3), 'portal', { gain: 0.5 })
-  groove(24, 31, { hats: 16 })
-  add(G(GAME_BEATS.slash), 'whoosh', { dur: 0.22, gain: 0.9 })
-  GAME_BOLT_BEATS.slice(0, 16).forEach((b) => add(G(b), 'zap', { gain: 0.45 }))
-  GAME_HIT_BEATS.forEach((b) => add(G(b), 'crunch', { gain: 0.5 }))
-  add(G(GAME_BEATS.lightning), 'crackle', { gain: 0.8 })
-  add(G(GAME_BEATS.lightning + 0.05), 'impact', { gain: 0.55 })
-  GAME_LOOT_BEATS.forEach((b, i) => add(G(b), 'bell', { midi: [84, 86, 88, 91, 93][i % 5] + (i % 3 === 0 ? 12 : 0), gain: 0.18, dur: 0.6 }))
-  ;[84, 88, 91, 96, 100].forEach((m, i) => add(G(GAME_BEATS.levelUp) + i * 0.08, 'bell', { midi: m, gain: 0.55, dur: 1.4 }))
-  add(G(GAME_BEATS.levelUp), 'shimmer', { gain: 0.6 })
-  // boss
-  add(G(GAME_BEATS.boss), 'growl', { gain: 0.8 })
-  add(G(GAME_BEATS.boss), 'stab', { notes: [45, 46, 52, 58], gain: 0.8 })
-  add(G(GAME_BEATS.bossLand), 'impact', { gain: 1 })
-  groove(32, 33, { hats: 16 })
-  for (let i = 0; i < 8; i++) add(33 + i * 0.0625, 'clap', { gain: 0.3 + i * 0.06 })
-  ;[0, 0.08, 0.16].forEach((d) => add(G(GAME_BEATS.telegraphBoom) + d, 'impact', { gain: 0.45 }))
-  for (let i = 0; i < 8; i++) add(G(GAME_BEATS.bullets) + i * 0.03, 'zap', { gain: 0.3 })
-  add(G(GAME_BEATS.charge), 'riser', { dur: BEAT * 0.4, gain: 0.7 })
-  add(G(GAME_BEATS.nova), 'impact', { gain: 1.2 })
-  add(G(GAME_BEATS.nova), 'drop', { dur: BEAT * 2, gain: 0.9 })
-  add(G(GAME_BEATS.nova), 'stab', { notes: [45, 57, 60, 64, 67], gain: 0.9 })
-  add(G(GAME_BEATS.shatter), 'shimmer', { gain: 0.8 })
-  add(G(GAME_BEATS.boom), 'impact', { gain: 1.3 })
-  add(G(GAME_BEATS.boom), 'crash', { gain: 0.9 })
-  add(G(GAME_BEATS.boom), 'drop', { dur: BEAT * 2.5, gain: 0.8 })
-
-  // --- 04 MUSIC — drums straight off the on-screen sequencer ------------------------------------------
+  // --- 04 SOUND — the sequencer's pattern and the staff's melody -----------------------------------------
   for (let bar = 0; bar < 2; bar++) {
-    const b0 = 36 + bar * 4
+    const b0 = 32 + bar * 4
     DRUMS.forEach((row) => {
       for (const s of row.steps) {
-        const beat = b0 + s / 4
-        if (beat >= 42.6) continue
-        add(beat, row.name === 'KICK' ? 'kick' : row.name === 'SNARE' ? 'clap' : row.name === 'HAT' ? 'hat' : 'perc', { gain: 0.85 })
+        const k: Kind = row.name === 'KICK' ? 'kick' : row.name === 'SNARE' ? 'clap' : row.name === 'HAT' ? 'hat' : 'perc'
+        add(b0 + s / 4, k, { gain: row.name === 'KICK' ? 0.7 : 0.6 })
       }
     })
-    const c = chord(9 + bar)
+    const c = chord(8 + bar)
     for (let s = 0; s < 16; s += 2) {
-      if (b0 + s / 4 >= 42.6) continue
-      add(b0 + s / 4, 'bass', { midi: c.bass - 12 + (s % 8 === 6 ? 12 : 0), dur: BEAT * 0.4, gain: 0.8 })
-      add(b0 + s / 4, 'arp', { midi: c.notes[(s / 2) % 4] + 12, gain: 0.6 })
+      add(b0 + s / 4, 'bass', { midi: c.bass - 12 + (s % 8 === 6 ? 12 : 0), dur: BEAT * 0.4, gain: 0.65 })
+      add(b0 + s / 4 + 0.25, 'arp', { midi: c.notes[(s / 2) % 4] + 12, gain: 0.4 })
     }
   }
-  ;[76, 79, 81, 84, 81, 79, 76, 74, 76, 79, 83, 81, 79, 76].forEach((m, k) =>
-    add(36 + 0.5 + k * 0.5 + (k % 3 === 1 ? 0.25 : 0), 'bell', { midi: m, gain: 0.7, dur: 1.1 }),
-  )
-  add(42.5, 'riser', { dur: BEAT * 1.5, gain: 0.55 })
+  for (const [b, m, d] of MELODY) add(32 + b, 'bell', { midi: m, gain: 0.6, dur: d * BEAT + 1 })
 
-  // --- RESOLVE ------------------------------------------------------------------------------------------
-  add(44, 'riser', { dur: BEAT * 2.5, gain: 0.9 })
-  for (const b of [45, 45.5, 45.75, 46, 46.125, 46.25, 46.375]) add(b, 'clap', { gain: 0.5 })
-  RESOLVE_PIECE_BEATS.forEach((b) => {
-    add(44 + b, 'whoosh', { dur: 0.2, gain: 0.5 })
-    add(44 + b, 'kick', { gain: 0.6 })
+  // --- RESOLVE ------------------------------------------------------------------------------------------------
+  RESOLVE_STROKE_BEATS.forEach((b, i) => {
+    add(40 + b, 'blip', { midi: [79, 83, 86, 88, 91, 95][i], gain: 0.3 })
+    add(40 + b, 'hat', { gain: 0.3 })
   })
-  add(SNAP_BEAT, 'impact', { gain: 1.4 })
-  add(SNAP_BEAT, 'stab', { notes: [48, 55, 64, 67, 71, 74], gain: 0.9 })
-  add(SNAP_BEAT, 'pad', { notes: CHORDS.Cmaj9.notes, dur: BEAT * 5.5, gain: 0.8, cutoff: 1600 })
+  add(40.7, 'arp', { midi: 67, gain: 0.5 })
+  add(SNAP_BEAT, 'pad', { notes: CHORDS.Cmaj9.notes, dur: BEAT * 5.5, gain: 0.7, cutoff: 1500 })
   add(SNAP_BEAT, 'strum', { notes: [36, 43, 52, 62, 67, 72] })
-  add(SNAP_BEAT, 'shimmer', { gain: 0.8 })
-  for (let i = 0; i < 11; i++) add(REVEAL_BEAT + i * 0.045, 'blip', { midi: 84 + (i % 4) * 3, gain: 0.25 })
-  add(REVEAL_BEAT, 'kick', { gain: 0.5 })
-  add(49, 'bell', { midi: 88, gain: 0.35, dur: 2 })
-  add(50.5, 'bell', { midi: 91, gain: 0.3, dur: 2 })
+  add(SNAP_BEAT, 'shimmer', { gain: 0.45 })
+  add(SNAP_BEAT, 'kick', { gain: 0.4 })
+  add(REVEAL_BEAT, 'bell', { midi: 88, gain: 0.35, dur: 2 })
+  add(45, 'bell', { midi: 91, gain: 0.25, dur: 2 })
 
   return ev.sort((a, b) => a.t - b.t)
 }

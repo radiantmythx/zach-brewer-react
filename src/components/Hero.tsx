@@ -5,19 +5,17 @@ import { attachFilm, seekSound, setSoundOn, subscribeSound, syncSound } from '..
 import { BEAT, CHAPTERS, REEL_END, REVEAL_BEAT, SNAP_BEAT } from '../film/timeline'
 
 /*
- * The hero is a stage for the reel. While it plays, the copy is held back;
- * on the logo snap the real wordmark (HTML, for SEO and a11y) slams in under
- * the resolved mark. The stage then holds for a beat of scroll while the
- * frame recedes into a card on the page. Chapter bars double as a scrubber.
+ * The hero is a stage for the reel, on the same paper as the page. While it
+ * plays, the copy is held back — each figure's caption occupies that spot —
+ * and when the mark completes, the real wordmark (HTML, for SEO and a11y)
+ * rises in beneath it. Chapter bars double as a scrubber.
  */
 
 const SEEN = 'zb-reel-seen'
-const NAME = 'Zach Brewer'
 const useIsoLayoutEffect = typeof window === 'undefined' ? useEffect : useLayoutEffect
 
 export default function Hero() {
   const sectionRef = useRef<HTMLElement>(null)
-  const stageRef = useRef<HTMLDivElement>(null)
   const canvasRef = useRef<HTMLCanvasElement>(null)
   const innerRef = useRef<HTMLDivElement>(null)
   const chaptersRef = useRef<HTMLDivElement>(null)
@@ -124,7 +122,7 @@ export default function Hero() {
       const fonts = document.fonts
       if (fonts) {
         Promise.race([
-          Promise.all([fonts.load('800 100px Unbounded'), fonts.load('500 20px "Geist Mono"'), fonts.load('italic 400 40px "Instrument Serif"')]),
+          Promise.all([fonts.load('400 60px "Instrument Serif"'), fonts.load('italic 400 60px "Instrument Serif"'), fonts.load('500 12px "Geist Mono"'), fonts.load('400 15px Geist')]),
           new Promise((r) => setTimeout(r, 1200)),
         ]).then(go, go)
       } else go()
@@ -165,17 +163,6 @@ export default function Hero() {
     }
     window.addEventListener('pointermove', onMove, { passive: true })
 
-    const scrollFx = () => {
-      const stage = stageRef.current
-      if (!stage) return
-      const travel = section.offsetHeight - window.innerHeight
-      const p = travel > 0 ? Math.min(1, Math.max(0, -section.getBoundingClientRect().top / travel)) : 0
-      stage.style.setProperty('--p', p.toFixed(4))
-    }
-    scrollFx()
-    window.addEventListener('scroll', scrollFx, { passive: true })
-    window.addEventListener('resize', scrollFx)
-
     engine.render(engine.now(), 1 / 60)
     run()
     setReady(true)
@@ -185,8 +172,6 @@ export default function Hero() {
       ro.disconnect()
       document.removeEventListener('visibilitychange', onVis)
       window.removeEventListener('pointermove', onMove)
-      window.removeEventListener('scroll', scrollFx)
-      window.removeEventListener('resize', scrollFx)
       attachFilm(null)
       setDirectorTarget(null)
       engine.destroy()
@@ -229,37 +214,34 @@ export default function Hero() {
   }
 
   const cls = ['hero', ready ? 'is-ready' : '', resolved ? 'is-resolved' : 'is-reel'].filter(Boolean).join(' ')
-  const accent = chapter >= 0 ? CHAPTERS[chapter].color : '#3DE3F5'
+  const accent = chapter >= 0 ? CHAPTERS[chapter].color : '#122630'
 
   return (
     <section id="top" ref={sectionRef} className={cls} aria-label="Introduction" style={{ '--chapter': accent } as CSSProperties}>
-      <div className="hero-sticky">
-        <div className="hero-stage" ref={stageRef}>
+      <div className="hero-stage">
           <canvas ref={canvasRef} className={`film${ready ? ' is-ready' : ''}`} aria-hidden="true" />
           <p className="sr-only">
-            A 24-second showreel drawn live in your browser: kinetic type, code assembling itself, vector shapes
-            snapping to a grid, a top-down action RPG boss fight, and a music visualizer, resolving into the ZB
-            logo.
+            A 22-second reel drawn live in the browser as a technical drawing: a contents page, a system
+            architecture diagram, an interface layout with redlines, an abstract real-time simulation and a
+            musical staff, resolving into the ZB monogram.
           </p>
-          <div className="film-grain" aria-hidden="true" />
-          <div className="film-vignette" aria-hidden="true" />
 
           <div className="hero-inner" ref={innerRef}>
             <div className="hero-copy">
               <p className="hero-kicker">
                 <i aria-hidden="true" />
-                Software engineer · Designer · Hopkins, MN
+                Software Engineer &amp; Designer — Hopkins, MN
               </p>
               <h1 className="hero-title">
-                {[...NAME].map((ch, i) => (
-                  <span key={i} className={ch === ' ' ? 'sp' : undefined} style={{ '--i': i } as CSSProperties}>
-                    {ch}
+                <span className="hero-line">
+                  <span>
+                    Zach <em>Brewer</em>
                   </span>
-                ))}
+                </span>
               </h1>
               <p className="hero-sub">
-                I build enterprise systems by day, and games, interfaces and music the rest of the time, all with
-                the same obsession for how things feel in motion.
+                Software engineer and designer. Ten years building enterprise platforms in financial services,
+                with a parallel practice in interface design, game systems and sound.
               </p>
             </div>
             <div className="hero-controls">
@@ -328,7 +310,6 @@ export default function Hero() {
               </button>
             ))}
           </div>
-        </div>
       </div>
     </section>
   )
