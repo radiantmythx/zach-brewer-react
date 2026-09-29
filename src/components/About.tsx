@@ -1,15 +1,34 @@
 import { useEffect, useRef } from 'react'
 import Reveal from './Reveal'
+import Callout from './ux/Callout'
 
 /*
  * One editorial statement, lit word by word as it scrolls through the
  * viewport, then four facts on hairline rules.
  */
 
-const STATEMENT: { text: string; em?: boolean }[] = [
-  { text: "I'm a software engineer and designer. For ten years I've built enterprise systems in financial services, most recently SPARC, a platform that replaces decades of mainframe automation at U.S. Bank. Alongside that work I design interfaces, build game systems and compose music, held to one standard throughout:" },
+interface Seg {
+  text: string
+  em?: boolean
+  note?: { title: string; body: string }
+}
+
+// Phrases with a note get a technical-drawing callout on hover / focus.
+const STATEMENT: Seg[] = [
+  { text: "I'm a software engineer and designer. For ten years I've built enterprise systems in financial services, most recently" },
+  { text: 'SPARC', note: { title: 'SPARC', body: 'React · C#/.NET GraphQL · Azure. 80+ mainframe scripts automated.' } },
+  { text: ', a platform that replaces decades of mainframe automation at' },
+  { text: 'U.S. Bank', note: { title: 'U.S. Bank', body: 'Software Engineer & AVP since 2020; systems analyst from 2017.' } },
+  { text: '. Alongside that work I' },
+  { text: 'design interfaces', note: { title: 'Fig. 02', body: 'Type, grid and motion, designed with intent.' } },
+  { text: ', build' },
+  { text: 'game systems', note: { title: 'Fig. 03', body: 'Godot, and a browser-based action RPG engine.' } },
+  { text: 'and' },
+  { text: 'compose music', note: { title: 'Fig. 04', body: 'The reel’s score is synthesized live — turn the sound on.' } },
+  { text: ', held to one standard throughout:' },
   { text: 'clear, precise, and built to last.', em: true },
 ]
+const startsWithPunct = (s: string) => /^[,.;:]/.test(s)
 
 const FACTS = [
   { label: 'Based in', value: 'Hopkins, Minnesota' },
@@ -52,13 +71,30 @@ export default function About() {
         </Reveal>
         <div>
           <p className="statement" ref={textRef}>
-            {STATEMENT.map((part, pi) => {
-              const words = part.text.split(' ').map((w, i) => (
-                <span className="w" key={`${pi}-${i}`}>
-                  {w}{' '}
+            {STATEMENT.map((seg, si) => {
+              const words = seg.text.split(' ').filter(Boolean)
+              const glue = si < STATEMENT.length - 1 && !startsWithPunct(STATEMENT[si + 1].text) ? ' ' : ''
+              const spans = words.map((w, i) => (
+                <span className="w" key={i}>
+                  {w}
+                  {i < words.length - 1 ? ' ' : ''}
                 </span>
               ))
-              return part.em ? <em key={pi}>{words}</em> : <span key={pi}>{words}</span>
+              const body = seg.note ? (
+                <Callout title={seg.note.title} note={seg.note.body}>
+                  {spans}
+                </Callout>
+              ) : seg.em ? (
+                <em>{spans}</em>
+              ) : (
+                spans
+              )
+              return (
+                <span key={si}>
+                  {body}
+                  {glue}
+                </span>
+              )
             })}
           </p>
           <Reveal delay={0.1}>

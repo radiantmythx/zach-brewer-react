@@ -6,6 +6,12 @@ import Experience from './components/Experience'
 import Hero from './components/Hero'
 import Nav from './components/Nav'
 import { toggleCommentary } from './film/director'
+import BackToTop from './components/ux/BackToTop'
+import Divider from './components/ux/Divider'
+import GridOverlay from './components/ux/GridOverlay'
+import Magnetic from './components/ux/Magnetic'
+import ScrollRuler from './components/ux/ScrollRuler'
+import Ticker from './components/ux/Ticker'
 
 // Lazy-loaded so the PDF library is split into its own chunk and never enters
 // the server/prerender bundle. Only fetched when the user opens the résumé.
@@ -57,11 +63,25 @@ export default function App() {
       <Nav onResumeClick={() => setShowResume(true)} />
       <main>
         <Hero />
+        <Divider index="01" label="Profile" />
         <About />
+        <Divider index="02" label="Four practices" />
         <Crafts />
+        <Ticker />
+        <Divider index="03" label="2012 — present" />
         <Experience />
         <Contact onOpenResume={() => setShowResume(true)} />
       </main>
+      <div className="sheet" aria-hidden="true">
+        <i />
+        <i />
+        <i />
+        <i />
+      </div>
+      <ScrollRuler />
+      <BackToTop />
+      <GridOverlay />
+      <Magnetic />
       <div className={`toast${toast ? ' is-on' : ''}`} role="status" aria-live="polite">
         {toast && (
           <>

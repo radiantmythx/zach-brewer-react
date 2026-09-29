@@ -1,6 +1,7 @@
 import { useEffect, useRef, useState } from 'react'
 import { pluck, setSoundOn, subscribeSound } from '../film/sound'
 import Reveal, { Lines } from './Reveal'
+import Colophon from './ux/Colophon'
 
 const EMAIL = 'zachary.brewer.professional@gmail.com'
 
@@ -258,6 +259,8 @@ export default function Contact({ onOpenResume }: { onOpenResume: () => void }) 
       </div>
 
       <PluckString sound={sound} />
+
+      <Colophon />
 
       <footer className="footer container">
         <span>© {year} Zach Brewer</span>

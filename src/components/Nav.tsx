@@ -1,5 +1,6 @@
 import { useEffect, useState } from 'react'
 import { LOGO } from '../film/logo'
+import { useActiveSection } from '../lib/scroll'
 
 /*
  * Minimal fixed nav. mix-blend-mode: difference keeps it legible on the dark
@@ -26,6 +27,8 @@ export function Mark() {
 
 export default function Nav({ onResumeClick }: NavProps) {
   const [hidden, setHidden] = useState(false)
+  const active = useActiveSection()
+  const cls = (id: string, extra = '') => `link-u${extra}${active === id ? ' is-active' : ''}`
 
   useEffect(() => {
     let last = window.scrollY
@@ -46,10 +49,18 @@ export default function Nav({ onResumeClick }: NavProps) {
         <span>Zach Brewer</span>
       </a>
       <nav className="nav-links" aria-label="Primary">
-        <a className="link-u nav-optional" href="#about">About</a>
-        <a className="link-u nav-optional" href="#disciplines">Disciplines</a>
-        <a className="link-u nav-optional" href="#experience">Experience</a>
-        <a className="link-u" href="#contact">Contact</a>
+        <a className={cls('about', ' nav-optional')} href="#about" aria-current={active === 'about' ? 'location' : undefined}>
+          About
+        </a>
+        <a className={cls('disciplines', ' nav-optional')} href="#disciplines" aria-current={active === 'disciplines' ? 'location' : undefined}>
+          Disciplines
+        </a>
+        <a className={cls('experience', ' nav-optional')} href="#experience" aria-current={active === 'experience' ? 'location' : undefined}>
+          Experience
+        </a>
+        <a className={cls('contact')} href="#contact" aria-current={active === 'contact' ? 'location' : undefined}>
+          Contact
+        </a>
         <button type="button" className="nav-cta" onClick={onResumeClick}>
           Résumé
         </button>

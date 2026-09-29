@@ -1,4 +1,4 @@
-import { useEffect, useRef, useState, type CSSProperties, type ElementType, type ReactNode } from 'react'
+import { useEffect, useRef, useState, type CSSProperties, type ElementType, type HTMLAttributes, type ReactNode } from 'react'
 
 /*
  * Entrance on first scroll into view. The server renders content visible
@@ -9,7 +9,7 @@ import { useEffect, useRef, useState, type CSSProperties, type ElementType, type
  * up from behind a mask instead — see <Lines>.
  */
 
-interface RevealProps {
+interface RevealProps extends Omit<HTMLAttributes<HTMLElement>, 'style' | 'className' | 'children'> {
   children: ReactNode
   as?: ElementType
   delay?: number
@@ -18,7 +18,7 @@ interface RevealProps {
   style?: CSSProperties
 }
 
-export default function Reveal({ children, as: Tag = 'div', delay = 0, variant = 'fade', className, style }: RevealProps) {
+export default function Reveal({ children, as: Tag = 'div', delay = 0, variant = 'fade', className, style, ...rest }: RevealProps) {
   const ref = useRef<HTMLElement>(null)
   const [state, setState] = useState<'ssr' | 'hidden' | 'shown'>('ssr')
 
@@ -51,7 +51,7 @@ export default function Reveal({ children, as: Tag = 'div', delay = 0, variant =
 
   const cls = ['reveal', variant === 'lines' ? 'reveal-lines' : '', className].filter(Boolean).join(' ')
   return (
-    <Tag ref={ref} className={cls} data-reveal={state} style={{ ...style, '--delay': `${delay}s` } as CSSProperties}>
+    <Tag {...rest} ref={ref} className={cls} data-reveal={state} style={{ ...style, '--delay': `${delay}s` } as CSSProperties}>
       {children}
     </Tag>
   )

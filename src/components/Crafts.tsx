@@ -367,7 +367,18 @@ export default function Crafts() {
         <div className="crafts-grid">
           {CRAFTS.map((c, i) => (
             <Reveal key={c.id} as="article" className="craft" delay={i * 0.08} style={{ '--c': c.color } as CSSProperties}>
-              <div className="craft-visual">{c.visual}</div>
+              <div className="craft-visual">
+                {c.visual}
+                <span className="crop" aria-hidden="true">
+                  <i />
+                  <i />
+                  <i />
+                  <i />
+                </span>
+                <span className="craft-spec" aria-hidden="true">
+                  FIG. 0{i + 1} · 320 × 220 · SVG
+                </span>
+              </div>
               <div className="craft-meta">
                 <span className="craft-num">0{i + 1}</span>
                 <h3>{c.title}</h3>

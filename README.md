@@ -44,6 +44,27 @@ bounds, beat clock, fps, hitboxes). In dev, `window.__film` exposes the engine
 - Type: Instrument Serif (display), Geist (text), Geist Mono (labels and annotations)
 - Tokens live in `src/index.css` under `@theme`
 
+### Page details (`src/components/ux/`, `src/lib/`)
+
+The page carries the reel's drawing-sheet language through to the end. Scroll
+state is shared by one passive listener in `src/lib/scroll.ts`.
+
+| Detail | Where |
+| --- | --- |
+| Scroll ruler: fixed tick ruler with a playhead and jump marks per section (≥1080px) | `ScrollRuler.tsx` |
+| Back to top: a registration mark whose ring fills with read progress | `BackToTop.tsx` |
+| Construction dividers: tick-ruled hairlines that draw out from a registration mark | `Divider.tsx` |
+| Ticker: tools and disciplines on two rows that speed up with scroll velocity | `Ticker.tsx` |
+| Callouts: dotted-underline phrases in About with leader-line notes, clamped to the viewport | `Callout.tsx` |
+| Magnetic pills and buttons | `Magnetic.tsx` |
+| Layout grid overlay: 12 columns, 20px gutter, 8px baseline. Press **G** | `GridOverlay.tsx`, `lib/grid.ts` |
+| Colophon: type specimens, palette, system spec and a hairline clock on Hopkins time | `Colophon.tsx` |
+| Career ruler (a Gantt of roles, linked to the timeline rows) and data figures under each SPARC stat | `Experience.tsx` |
+| Crop marks and figure specs on discipline cards; scroll-spy brackets in the nav; paper grain and sheet corners | `Crafts.tsx`, `Nav.tsx`, `index.css` |
+
+Everything is server-rendered visible and animates in on the client.
+Reduced motion turns the motion off.
+
 ## Pre-rendering (SEO)
 
 `npm run build` runs three steps:
