@@ -1,10 +1,11 @@
 /*
  * Generates the Open Graph image (1200×630) and apple-touch-icon (180×180)
- * in the site's mainframe → sakura visual language.
+ * in the site's "one line" language: a single glowing stroke that runs
+ * through all four chapters of the hero film — an easing curve, a game
+ * level, a waveform — over the film's black.
  *
- * The wordmark is drawn as bitmap-font rects (no font dependency), with each
- * letter's color interpolated green → pink so the image itself performs the
- * migration. Run: node scripts/generate-og.mjs
+ * Text uses system fonts (Georgia / Consolas) because librsvg can't load
+ * web fonts. Run: node scripts/generate-og.mjs
  */
 import sharp from 'sharp'
 import { writeFileSync } from 'node:fs'
@@ -12,167 +13,121 @@ import { fileURLToPath } from 'node:url'
 import { dirname, join } from 'node:path'
 
 const ROOT = join(dirname(fileURLToPath(import.meta.url)), '..')
-
-// Same bitmap font as Hero.tsx
-const FONT = {
-  Z: ['█████', '   █ ', '  █  ', ' █   ', '█████'],
-  A: [' ███ ', '█   █', '█████', '█   █', '█   █'],
-  C: [' ████', '█    ', '█    ', '█    ', ' ████'],
-  H: ['█   █', '█   █', '█████', '█   █', '█   █'],
-  B: ['████ ', '█   █', '████ ', '█   █', '████ '],
-  R: ['████ ', '█   █', '████ ', '█  █ ', '█   █'],
-  E: ['█████', '█    ', '████ ', '█    ', '█████'],
-  W: ['█   █', '█   █', '█ █ █', '█ █ █', ' █ █ '],
-  ' ': ['     ', '     ', '     ', '     ', '     '],
-}
-
-const lerp = (a, b, t) => Math.round(a + (b - a) * t)
-const GREEN = [70, 247, 143]
-const PINK = [255, 143, 184]
-
-function letterColor(t) {
-  return `rgb(${lerp(GREEN[0], PINK[0], t)},${lerp(GREEN[1], PINK[1], t)},${lerp(GREEN[2], PINK[2], t)})`
-}
-
-/* Render a word as rects. cell = pixel size. Returns { svg, width } */
-function bitmapWord(word, x, y, cell, colorFor) {
-  let svg = ''
-  let col = 0
-  for (let li = 0; li < word.length; li++) {
-    const glyph = FONT[word[li]]
-    const fill = colorFor(li / Math.max(1, word.length - 1))
-    for (let r = 0; r < 5; r++) {
-      for (let c = 0; c < 5; c++) {
-        if (glyph[r][c] === '█') {
-          svg += `<rect x="${x + (col + c) * cell}" y="${y + r * cell}" width="${cell - 1.5}" height="${cell - 1.5}" rx="1.5" fill="${fill}"/>`
-        }
-      }
-    }
-    col += 6
-  }
-  return { svg, width: (col - 1) * cell }
-}
-
-function blossom(x, y, r, spin = 0, opacity = 1) {
-  let petals = ''
-  for (const deg of [0, 72, 144, 216, 288]) {
-    petals += `<ellipse cx="0" cy="${-r * 0.55}" rx="${r * 0.34}" ry="${r * 0.5}" fill="url(#petal)" transform="rotate(${deg})"/>`
-  }
-  return `<g transform="translate(${x} ${y}) rotate(${spin})" opacity="${opacity}">${petals}<circle r="${r * 0.16}" fill="#ffe9a8"/></g>`
-}
-
-function asciiGlyph(x, y, size, ch, opacity) {
-  // '+' and '*' drawn as rects so no font is needed
-  const t = size / 5
-  if (ch === '+') {
-    return `<g fill="#46f78f" opacity="${opacity}"><rect x="${x - t / 2}" y="${y - size / 2}" width="${t}" height="${size}"/><rect x="${x - size / 2}" y="${y - t / 2}" width="${size}" height="${t}"/></g>`
-  }
-  // '*': three crossing bars
-  return `<g stroke="#46f78f" stroke-width="${t}" opacity="${opacity}" stroke-linecap="round">
-    <line x1="${x}" y1="${y - size / 2}" x2="${x}" y2="${y + size / 2}"/>
-    <line x1="${x - size * 0.43}" y1="${y - size * 0.25}" x2="${x + size * 0.43}" y2="${y + size * 0.25}"/>
-    <line x1="${x - size * 0.43}" y1="${y + size * 0.25}" x2="${x + size * 0.43}" y2="${y - size * 0.25}"/>
-  </g>`
-}
-
 const W = 1200
 const H = 630
+const HUES = ['#7C9DFF', '#FF6B4A', '#3FE0A0', '#FFC24D']
+const bez = (a, b, c, d, s) => (1 - s) ** 3 * a + 3 * (1 - s) ** 2 * s * b + 3 * (1 - s) * s * s * c + s ** 3 * d
 
-// Wordmark: "ZACH BREWER" on one line, centered
-const CELL = 15
-const WORD = 'ZACH BREWER'
-const wordCols = WORD.length * 6 - 1
-const wordWidth = wordCols * CELL
-const wordX = (W - wordWidth) / 2
-const wordY = 200
-
-const name = bitmapWord(WORD, wordX, wordY, CELL, letterColor)
-
-// Migration progress bar under the tagline
-const BAR_X = 350
-const BAR_Y = 445
-const BAR_W = 500
-const CELLS = 24
-let bar = ''
-for (let i = 0; i < CELLS; i++) {
-  const t = i / (CELLS - 1)
-  const filled = i < CELLS - 3
-  bar += `<rect x="${BAR_X + i * (BAR_W / CELLS)}" y="${BAR_Y}" width="${BAR_W / CELLS - 4}" height="22" rx="2" fill="${filled ? letterColor(t) : 'rgba(255,255,255,0.12)'}"/>`
+/* ---- the line: ease curve → handle → level → waveform ---- */
+const pts = []
+// 01 the easing curve, cubic-bezier(0.65, 0, 0.35, 1)
+for (let i = 0; i <= 80; i++) {
+  const s = i / 80
+  pts.push([bez(80, 275, 185, 380, s), bez(300, 300, 140, 140, s)])
 }
+// 02 a designed flourish down to the horizon
+for (let i = 1; i <= 50; i++) {
+  const s = i / 50
+  pts.push([bez(380, 440, 430, 500, s), bez(140, 140, 262, 262, s)])
+}
+// 03 the level: spikes, then a block
+const ground = (x) => {
+  let y = 262
+  if (x > 548 && x < 620) {
+    const f = ((x - 548) % 24) / 24
+    y -= 24 * (1 - Math.abs(f * 2 - 1))
+  }
+  if (x >= 662 && x <= 730) y -= 44
+  return y
+}
+for (let x = 502; x <= 790; x += 2) pts.push([x, ground(x)])
+// 04 the waveform, four partials summed
+for (let x = 792; x <= 1120; x += 2) {
+  const s = (x - 792) / 328
+  const w = Math.sin(Math.PI * s) ** 0.7
+  const rise = Math.min(1, s * 6)
+  const y =
+    262 -
+    rise * 52 +
+    w * (34 * Math.sin(s * 11) + 20 * Math.sin(s * 17 + 1.3) + 14 * Math.sin(s * 23 + 2.1) + 9 * Math.sin(s * 31 + 0.7))
+  pts.push([x, y])
+}
+const d = pts.map(([x, y], i) => `${i ? 'L' : 'M'}${x.toFixed(1)} ${y.toFixed(1)}`).join(' ')
 
-// Scattered decorations: ASCII glyphs on the left, blossoms on the right
-const decorations = [
-  asciiGlyph(90, 90, 26, '+', 0.5),
-  asciiGlyph(160, 170, 20, '*', 0.4),
-  asciiGlyph(70, 300, 18, '*', 0.35),
-  asciiGlyph(210, 60, 16, '+', 0.3),
-  asciiGlyph(120, 470, 22, '*', 0.4),
-  asciiGlyph(250, 380, 14, '+', 0.25),
-  blossom(1050, 100, 44, 15, 0.9),
-  blossom(1130, 210, 30, -20, 0.75),
-  blossom(980, 60, 24, 40, 0.6),
-  blossom(1090, 480, 38, -10, 0.85),
-  blossom(970, 560, 24, 30, 0.6),
-  blossom(1160, 380, 20, 0, 0.5),
-].join('')
+const labels = [
+  ['01', 'Programming', 80],
+  ['02', 'Design', 400],
+  ['03', 'Game design', 600],
+  ['04', 'Music', 860],
+]
+  .map(
+    ([n, t, x], i) =>
+      `<text x="${x}" y="352" font-family="Consolas, 'Courier New', monospace" font-size="17" letter-spacing="1"><tspan fill="${HUES[i]}">${n}</tspan><tspan fill="#8b8a86" dx="10">${t}</tspan></text>
+       <rect x="${x}" y="322" width="150" height="2" rx="1" fill="${HUES[i]}" opacity="${i === 0 ? 0.9 : 0.35}"/>`,
+  )
+  .join('')
 
 const og = `<svg xmlns="http://www.w3.org/2000/svg" width="${W}" height="${H}">
   <defs>
-    <linearGradient id="bg" x1="0%" y1="0%" x2="100%" y2="100%">
-      <stop offset="0%" stop-color="#041007"/>
-      <stop offset="55%" stop-color="#0a0810"/>
-      <stop offset="100%" stop-color="#160b18"/>
+    <linearGradient id="hue" x1="80" y1="0" x2="1120" y2="0" gradientUnits="userSpaceOnUse">
+      <stop offset="0" stop-color="${HUES[0]}"/>
+      <stop offset=".33" stop-color="${HUES[1]}"/>
+      <stop offset=".6" stop-color="${HUES[2]}"/>
+      <stop offset="1" stop-color="${HUES[3]}"/>
     </linearGradient>
-    <radialGradient id="petal" cx="50%" cy="30%" r="80%">
-      <stop offset="0%" stop-color="#ffd3e3"/>
-      <stop offset="100%" stop-color="#e2578f"/>
+    <radialGradient id="vig" cx="50%" cy="38%" r="75%">
+      <stop offset="0.55" stop-color="#000" stop-opacity="0"/>
+      <stop offset="1" stop-color="#000" stop-opacity="0.6"/>
     </radialGradient>
-    <pattern id="scan" width="4" height="4" patternUnits="userSpaceOnUse">
-      <rect width="4" height="4" fill="transparent"/>
-      <rect y="2" width="4" height="1" fill="rgba(0,0,0,0.35)"/>
-    </pattern>
-    <filter id="glow" x="-40%" y="-40%" width="180%" height="180%">
-      <feGaussianBlur stdDeviation="6" result="b"/>
-      <feMerge><feMergeNode in="b"/><feMergeNode in="SourceGraphic"/></feMerge>
-    </filter>
+    <filter id="blur" x="-10%" y="-40%" width="120%" height="180%"><feGaussianBlur stdDeviation="10"/></filter>
   </defs>
+  <rect width="${W}" height="${H}" fill="#08080A"/>
 
-  <rect width="${W}" height="${H}" fill="url(#bg)"/>
-  <ellipse cx="220" cy="315" rx="420" ry="360" fill="rgba(70,247,143,0.05)"/>
-  <ellipse cx="1030" cy="315" rx="430" ry="380" fill="rgba(226,87,143,0.07)"/>
+  <text x="80" y="104" font-family="Consolas, 'Courier New', monospace" font-size="17" fill="#5e6372">const ease = <tspan fill="${HUES[2]}">cubicBezier</tspan>(<tspan fill="${HUES[3]}">0.65, 0, 0.35, 1</tspan>)</text>
 
-  ${decorations}
+  <!-- bezier handles on the curve -->
+  <g stroke="rgba(255,255,255,0.45)" stroke-width="1.2">
+    <line x1="80" y1="300" x2="275" y2="300"/><line x1="380" y1="140" x2="185" y2="140"/>
+  </g>
+  <circle cx="275" cy="300" r="5" fill="#fff"/><circle cx="185" cy="140" r="5" fill="${HUES[1]}"/>
 
-  <!-- terminal prompt line -->
-  <text x="${wordX}" y="150" font-family="Consolas, 'Courier New', monospace" font-size="24" fill="#2a9457" letter-spacing="2">visitor@zb-s370:~$ ./introduce --name</text>
+  <!-- the line: blur halo, glow, body, hot core -->
+  <path d="${d}" fill="none" stroke="url(#hue)" stroke-width="18" stroke-linecap="round" stroke-linejoin="round" opacity="0.55" filter="url(#blur)"/>
+  <path d="${d}" fill="none" stroke="url(#hue)" stroke-width="7" stroke-linecap="round" stroke-linejoin="round" opacity="0.35"/>
+  <path d="${d}" fill="none" stroke="url(#hue)" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"/>
+  <path d="${d}" fill="none" stroke="#fff" stroke-width="1.1" stroke-linecap="round" stroke-linejoin="round" opacity="0.7"/>
 
-  <g filter="url(#glow)">${name.svg}</g>
+  <rect x="75.5" y="295.5" width="9" height="9" fill="#08080A" stroke="#fff" stroke-width="1.5"/>
+  <rect x="375.5" y="135.5" width="9" height="9" fill="#08080A" stroke="#fff" stroke-width="1.5"/>
 
-  <!-- tagline -->
-  <text x="${W / 2}" y="390" text-anchor="middle" font-family="Consolas, 'Courier New', monospace" font-size="26" fill="#d8d3dc" letter-spacing="6">SOFTWARE ENGINEER — MAINFRAME → CLOUD</text>
+  <!-- the little hero, mid-jump, and a coin -->
+  <circle cx="690" cy="170" r="38" fill="${HUES[2]}" opacity="0.12"/>
+  <rect x="673" y="152" width="34" height="34" rx="8" fill="${HUES[2]}"/>
+  <rect x="690" y="160" width="4" height="10" rx="2" fill="#04281A"/><rect x="698" y="160" width="4" height="10" rx="2" fill="#04281A"/>
+  <path d="M584 176 L592 188 L584 200 L576 188 Z" fill="${HUES[3]}"/>
 
-  <!-- migration bar -->
-  ${bar}
-  <text x="${W / 2}" y="510" text-anchor="middle" font-family="Consolas, 'Courier New', monospace" font-size="22" fill="#ff8fb8" letter-spacing="4">MIGRATION ▸ 88% — SYSTEM IN FULL BLOOM</text>
+  ${labels}
 
-  <!-- url -->
-  <text x="${W / 2}" y="585" text-anchor="middle" font-family="Consolas, 'Courier New', monospace" font-size="24" fill="#8a8494" letter-spacing="3">zachbrewer.com</text>
+  <rect width="${W}" height="${H}" fill="url(#vig)"/>
 
-  <rect width="${W}" height="${H}" fill="url(#scan)"/>
+  <text x="80" y="452" font-family="Consolas, 'Courier New', monospace" font-size="17" letter-spacing="3" fill="#8b8a86">SOFTWARE ENGINEER · DESIGNER</text>
+  <text x="74" y="552" font-family="Georgia, 'Times New Roman', serif" font-size="104" fill="#F2EFE8" letter-spacing="-2">Zach <tspan font-style="italic">Brewer</tspan></text>
+  <text x="1120" y="548" text-anchor="end" font-family="Consolas, 'Courier New', monospace" font-size="19" letter-spacing="1.5" fill="#8b8a86">zachbrewer.com</text>
 </svg>`
 
-// Apple touch icon: the favicon design at 180×180 with square-ish corners
+// Apple touch icon: the favicon's easing curve at 180×180 (iOS rounds the corners itself)
 const icon = `<svg xmlns="http://www.w3.org/2000/svg" width="180" height="180">
   <defs>
-    <radialGradient id="petal" cx="50%" cy="30%" r="80%">
-      <stop offset="0%" stop-color="#ffd3e3"/>
-      <stop offset="100%" stop-color="#e2578f"/>
-    </radialGradient>
+    <linearGradient id="l" x1="0" y1="1" x2="1" y2="0">
+      <stop offset="0" stop-color="${HUES[0]}"/><stop offset=".38" stop-color="${HUES[1]}"/>
+      <stop offset=".68" stop-color="${HUES[2]}"/><stop offset="1" stop-color="${HUES[3]}"/>
+    </linearGradient>
+    <filter id="b" x="-20%" y="-20%" width="140%" height="140%"><feGaussianBlur stdDeviation="6"/></filter>
   </defs>
-  <rect width="180" height="180" fill="#071009"/>
-  <path d="M 28 96 L 62 118 L 28 140" stroke="#46f78f" stroke-width="14" stroke-linecap="round" stroke-linejoin="round" fill="none"/>
-  <rect x="76" y="130" width="40" height="14" rx="4" fill="#46f78f"/>
-  ${blossom(121, 56, 46, 0, 1)}
+  <rect width="180" height="180" fill="#08080A"/>
+  <path d="M38 136 C 101 136, 79 44, 142 44" fill="none" stroke="url(#l)" stroke-width="20" stroke-linecap="round" opacity="0.5" filter="url(#b)"/>
+  <path d="M38 136 C 101 136, 79 44, 142 44" fill="none" stroke="url(#l)" stroke-width="12" stroke-linecap="round"/>
+  <circle cx="142" cy="44" r="10" fill="#FFF4DA"/>
 </svg>`
 
 const ogPng = await sharp(Buffer.from(og)).png({ compressionLevel: 9 }).toBuffer()

@@ -1,22 +1,13 @@
-/* ═══════════════════════════════════════════════════
-   ZB/370 SYSTEM CONSOLE — HUMANS FILE
-   ═══════════════════════════════════════════════════
+/* ─────────────────────────────────────────────────
 
-     █████  ███   ████ █   █
-        █  █   █ █     █   █
-       █   █████ █     █████
-      █    █   █ █     █   █
-     █████ █   █  ████ █   █
+        ●───╮
+            ╰──────●         one line,
+                             four crafts.
 
-              *      .    +
-          .      *        .     you found the
-              +      *          humans file. nice.
-          *      .       +
-
-   ═══════════════════════════════════════════════════ */
+   ───────────────────────────────────────────────── */
 
 /* TEAM */
-Engineer: Zach Brewer
+Engineer & designer: Zach Brewer
 Title: Software Engineer, AVP @ U.S. Bank
 Location: Hopkins, MN, USA
 Contact: zachary.brewer.professional [at] gmail.com
@@ -24,16 +15,17 @@ GitHub: https://github.com/radiantmythx
 LinkedIn: https://www.linkedin.com/in/zachary-brewer-88653269/
 
 /* SITE */
-Concept: a career migration, mainframe → cloud, that
-         blooms into sakura as you scroll
+Concept: one continuous line performs a 32-second film in four
+         chapters: programming → design → game design → music
+Film: hand-written Canvas 2D, rendered live every frame
+Score: generative Web Audio, synthesized in the browser
+       (no samples, no video files)
 Stack: React 19, TypeScript, Vite, Tailwind v4
 Rendering: pre-rendered static HTML + hydration
-Motion: hand-rolled canvas — no animation libraries
-Easter eggs: more than zero. the terminal on the
-             homepage answers to 'help'. try 'sakura'.
+Type: Instrument Serif, Geist, Geist Mono
 
 /* STANDARDS */
-Components: hand-built, craft-obsessed
-Accessibility: reduced-motion respected, keyboard
-               friendly, screen-reader labels
-Last bloom: 2026-07
+Accessibility: reduced motion respected (the film starts
+               paused), pause control, keyboard friendly
+Easter eggs: exactly one. ↑ ↑ ↓ ↓ ← → ← → B A
+Last updated: 2026-09

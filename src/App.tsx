@@ -1,105 +1,79 @@
 import { Suspense, lazy, useEffect, useState } from 'react'
-import Nav from './components/Nav'
-import Hero from './components/Hero'
-import Experience from './components/Experience'
 import About from './components/About'
 import Contact from './components/Contact'
-import PetalField from './components/PetalField'
-import MigrationHUD from './components/MigrationHUD'
-import { ERA_NAMES, startEraEngine, subscribeEra, triggerPetalStorm } from './era'
+import Crafts from './components/Crafts'
+import Experience from './components/Experience'
+import Hero from './components/Hero'
+import Nav from './components/Nav'
+import { toggleCommentary } from './film/director'
 
 // Lazy-loaded so the PDF library is split into its own chunk and never enters
-// the server/prerender bundle. Only fetched when the user opens the resume.
+// the server/prerender bundle. Only fetched when the user opens the résumé.
 const ResumeModal = lazy(() => import('./components/Resume'))
+
+const KONAMI = ['ArrowUp', 'ArrowUp', 'ArrowDown', 'ArrowDown', 'ArrowLeft', 'ArrowRight', 'ArrowLeft', 'ArrowRight', 'b', 'a']
 
 export default function App() {
   const [showResume, setShowResume] = useState(false)
-  const [crossEffect, setCrossEffect] = useState<'sweep' | 'bloom' | null>(null)
+  const [toast, setToast] = useState<string | null>(null)
 
-  // The era engine drives the whole page's mainframe → cloud migration:
-  // scroll position interpolates the global palette CSS variables.
-  useEffect(() => startEraEngine(), [])
-
-  // Era-crossing moments — each fires ONCE per page load, and the effects
-  // themselves migrate from digital to nature as the page progresses:
-  //   entering era 2 → RGB glitch (pure digital artifact)
-  //   entering era 3 → luminous scan-line sweep (softer, warmer)
-  //   entering era 4 → bloom pulse + petal flurry (nature takes over)
-  useEffect(() => {
-    const eraIndex = (p: number) => ERA_NAMES.findIndex((e) => p <= e.until)
-    const fired = new Set<number>()
-    let lastEra = eraIndex(0)
-    const timers: number[] = []
-
-    const unsub = subscribeEra((p) => {
-      const idx = eraIndex(p)
-      if (idx > lastEra && !fired.has(idx)) {
-        fired.add(idx)
-        if (idx === 1) {
-          document.documentElement.classList.add('era-glitch')
-          timers.push(
-            window.setTimeout(() => document.documentElement.classList.remove('era-glitch'), 320),
-          )
-        } else if (idx === 2) {
-          setCrossEffect('sweep')
-          timers.push(window.setTimeout(() => setCrossEffect(null), 1000))
-        } else if (idx === 3) {
-          setCrossEffect('bloom')
-          triggerPetalStorm(0.4)
-          timers.push(window.setTimeout(() => setCrossEffect(null), 1200))
-        }
-      }
-      lastEra = idx
-    })
-    return () => {
-      unsub()
-      timers.forEach(clearTimeout)
-    }
-  }, [])
-
-  // Engagement details: a DevTools calling card and a tab title that notices
-  // when you leave.
+  // The one easter egg: the Konami code turns on the director's commentary,
+  // which reveals the film's rig (points, control polygons, clocks, fps).
   useEffect(() => {
     console.log(
-      '%c❀ ZACH BREWER — MAINFRAME → CLOUD ❀',
-      'color:#ff8fb8; font-family:monospace; font-size:14px; font-weight:bold; text-shadow:0 0 8px rgba(226,87,143,0.6)',
+      '%cZach Brewer%c  one line, four crafts',
+      'font: 400 22px "Instrument Serif", Georgia, serif; color: #f2efe8; background: #08080a; padding: 8px 4px 8px 12px;',
+      'font: 12px "Geist Mono", monospace; color: #ffc24d; background: #08080a; padding: 12px 12px 12px 4px;',
     )
     console.log(
-      '%c    *  .  ❀     you found the console.\n' +
-        '  .   ❀    *    there is a terminal on the homepage —\n' +
-        '    ❀  *   .    try typing: sakura\n',
-      'color:#46f78f; font-family:monospace;',
+      '%cThe film at the top of the page is drawn live: 520 points, four scenes, one clock, no video files.\n' +
+        'Want to see the rig? Try the Konami code on the page.  ↑ ↑ ↓ ↓ ← → ← → B A',
+      'font: 12px "Geist Mono", monospace; color: #7c9dff; line-height: 1.7;',
     )
 
-    const originalTitle = document.title
-    const onVisibility = () => {
-      document.title = document.hidden ? '❀ migration paused — come back' : originalTitle
+    let i = 0
+    let timer = 0
+    const onKey = (e: KeyboardEvent) => {
+      const key = e.key.length === 1 ? e.key.toLowerCase() : e.key
+      i = key === KONAMI[i] ? i + 1 : key === KONAMI[0] ? 1 : 0
+      if (i < KONAMI.length) return
+      i = 0
+      const on = toggleCommentary()
+      if (on === null) return
+      setToast(on ? 'on' : 'off')
+      window.clearTimeout(timer)
+      timer = window.setTimeout(() => setToast(null), 2600)
+      if (on && window.scrollY > window.innerHeight * 0.5) window.scrollTo({ top: 0, behavior: 'smooth' })
     }
-    document.addEventListener('visibilitychange', onVisibility)
+    window.addEventListener('keydown', onKey)
     return () => {
-      document.removeEventListener('visibilitychange', onVisibility)
-      document.title = originalTitle
+      window.removeEventListener('keydown', onKey)
+      window.clearTimeout(timer)
     }
   }, [])
 
   return (
     <>
       <Nav onResumeClick={() => setShowResume(true)} />
-      <PetalField />
-      <MigrationHUD />
-      {crossEffect === 'sweep' && <div className="sweep-overlay" aria-hidden="true" />}
-      {crossEffect === 'bloom' && <div className="bloom-pulse-overlay" aria-hidden="true" />}
+      <main>
+        <Hero />
+        <About />
+        <Crafts />
+        <Experience />
+        <Contact onOpenResume={() => setShowResume(true)} />
+      </main>
+      <div className={`toast${toast ? ' is-on' : ''}`} role="status" aria-live="polite">
+        {toast && (
+          <>
+            <b>Director&apos;s commentary</b> {toast}
+          </>
+        )}
+      </div>
       {showResume && (
         <Suspense fallback={null}>
           <ResumeModal isOpen onClose={() => setShowResume(false)} />
         </Suspense>
       )}
-      <main>
-        <Hero onOpenResume={() => setShowResume(true)} />
-        <Experience />
-        <About />
-        <Contact />
-      </main>
     </>
   )
 }

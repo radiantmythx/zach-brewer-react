@@ -1,11 +1,16 @@
 import { StrictMode } from 'react'
-import { hydrateRoot } from 'react-dom/client'
+import { createRoot, hydrateRoot } from 'react-dom/client'
 import './index.css'
 import App from './App.tsx'
 
-hydrateRoot(
-  document.getElementById('root')!,
+const root = document.getElementById('root')!
+const app = (
   <StrictMode>
     <App />
-  </StrictMode>,
+  </StrictMode>
 )
+
+// Production HTML is pre-rendered (scripts/prerender.mjs), so hydrate it.
+// The dev server serves the empty template, so render from scratch there.
+if (root.firstElementChild) hydrateRoot(root, app)
+else createRoot(root).render(app)

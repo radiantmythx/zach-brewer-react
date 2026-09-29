@@ -1,22 +1,26 @@
-import { useEffect, useRef, useState, type CSSProperties, type ReactNode } from 'react'
+import { useEffect, useRef, useState, type CSSProperties, type ElementType, type ReactNode } from 'react'
 
 /*
- * Slide-and-fade entrance for section content the first time it scrolls into
- * view. Server renders fully visible (SEO/no-JS safe); the client hides on
- * mount and reveals on intersection, with a failsafe so content can never
- * stay hidden. Reduced motion skips the whole dance.
+ * Entrance on first scroll into view. The server renders content visible
+ * (SEO / no-JS safe); the client hides on mount and reveals on intersection,
+ * with a failsafe so nothing can stay hidden. Reduced motion skips it all.
+ *
+ * variant="lines" leaves the block in place and slides each `.line > span`
+ * up from behind a mask instead — see <Lines>.
  */
 
 interface RevealProps {
   children: ReactNode
+  as?: ElementType
   delay?: number
+  variant?: 'fade' | 'lines'
+  className?: string
   style?: CSSProperties
 }
 
-export default function Reveal({ children, delay = 0, style }: RevealProps) {
-  const ref = useRef<HTMLDivElement>(null)
-  const [hidden, setHidden] = useState(false)
-  const shown = useRef(false)
+export default function Reveal({ children, as: Tag = 'div', delay = 0, variant = 'fade', className, style }: RevealProps) {
+  const ref = useRef<HTMLElement>(null)
+  const [state, setState] = useState<'ssr' | 'hidden' | 'shown'>('ssr')
 
   useEffect(() => {
     const el = ref.current
@@ -24,42 +28,44 @@ export default function Reveal({ children, delay = 0, style }: RevealProps) {
     if (window.matchMedia('(prefers-reduced-motion: reduce)').matches) return
 
     // eslint-disable-next-line react-hooks/set-state-in-effect -- intentional rewind: SSR is visible, client hides before observing
-    setHidden(true)
-
+    setState('hidden')
+    let done = false
     const reveal = () => {
-      if (shown.current) return
-      shown.current = true
+      if (done) return
+      done = true
       observer.disconnect()
       clearTimeout(failsafe)
-      setHidden(false)
+      setState('shown')
     }
-
-    const observer = new IntersectionObserver(
-      ([entry]) => {
-        if (entry.isIntersecting) reveal()
-      },
-      { threshold: 0.12 },
-    )
+    const observer = new IntersectionObserver(([entry]) => entry.isIntersecting && reveal(), {
+      threshold: 0.12,
+      rootMargin: '0px 0px -6% 0px',
+    })
     observer.observe(el)
-    const failsafe = window.setTimeout(reveal, 10000)
-
+    const failsafe = window.setTimeout(reveal, 12000)
     return () => {
       observer.disconnect()
       clearTimeout(failsafe)
     }
   }, [])
 
+  const cls = ['reveal', variant === 'lines' ? 'reveal-lines' : '', className].filter(Boolean).join(' ')
   return (
-    <div
-      ref={ref}
-      style={{
-        ...style,
-        opacity: hidden ? 0 : 1,
-        transform: hidden ? 'translateY(30px)' : 'none',
-        transition: `opacity 0.7s var(--ease-out) ${delay}s, transform 0.9s var(--ease-expo) ${delay}s`,
-      }}
-    >
+    <Tag ref={ref} className={cls} data-reveal={state} style={{ ...style, '--delay': `${delay}s` } as CSSProperties}>
       {children}
-    </div>
+    </Tag>
+  )
+}
+
+/** Masked lines for a display heading. Each entry is one visual line. */
+export function Lines({ lines }: { lines: ReactNode[] }) {
+  return (
+    <>
+      {lines.map((l, i) => (
+        <span className="line" key={i}>
+          <span style={{ '--i': i } as CSSProperties}>{l}</span>
+        </span>
+      ))}
+    </>
   )
 }

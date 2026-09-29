@@ -1,21 +1,14 @@
 <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 64 64">
   <defs>
-    <radialGradient id="p" cx="50%" cy="30%" r="80%">
-      <stop offset="0%" stop-color="#ffd3e3"/>
-      <stop offset="100%" stop-color="#e2578f"/>
-    </radialGradient>
+    <linearGradient id="l" x1="0" y1="1" x2="1" y2="0">
+      <stop offset="0" stop-color="#7C9DFF"/>
+      <stop offset=".38" stop-color="#FF6B4A"/>
+      <stop offset=".68" stop-color="#3FE0A0"/>
+      <stop offset="1" stop-color="#FFC24D"/>
+    </linearGradient>
   </defs>
-  <rect width="64" height="64" rx="14" fill="#071009"/>
-  <!-- phosphor terminal prompt: >_ -->
-  <path d="M 10 34 L 22 42 L 10 50" stroke="#46f78f" stroke-width="5" stroke-linecap="round" stroke-linejoin="round" fill="none"/>
-  <rect x="27" y="46" width="14" height="5" rx="1.5" fill="#46f78f"/>
-  <!-- sakura blossom -->
-  <g transform="translate(43 20)">
-    <ellipse cx="0" cy="-8.5" rx="5.2" ry="8" fill="url(#p)"/>
-    <ellipse cx="0" cy="-8.5" rx="5.2" ry="8" fill="url(#p)" transform="rotate(72)"/>
-    <ellipse cx="0" cy="-8.5" rx="5.2" ry="8" fill="url(#p)" transform="rotate(144)"/>
-    <ellipse cx="0" cy="-8.5" rx="5.2" ry="8" fill="url(#p)" transform="rotate(216)"/>
-    <ellipse cx="0" cy="-8.5" rx="5.2" ry="8" fill="url(#p)" transform="rotate(288)"/>
-    <circle r="2.6" fill="#ffe9a8"/>
-  </g>
+  <rect width="64" height="64" rx="15" fill="#08080A"/>
+  <!-- the film's easing curve: cubic-bezier(0.65, 0, 0.35, 1) -->
+  <path d="M13 49 C 36.4 49, 27.6 15, 51 15" fill="none" stroke="url(#l)" stroke-width="5.5" stroke-linecap="round"/>
+  <circle cx="51" cy="15" r="4.2" fill="#FFF4DA"/>
 </svg>

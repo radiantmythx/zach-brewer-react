@@ -1,13 +1,6 @@
-# ┌──────────────────────────────────────────────────┐
-# │  ZB/370 SYSTEM CONSOLE — zachbrewer.com           │
-# │  mainframe → cloud · petals fall on every era     │
-# │                                                   │
-# │      *  .  +        hello, crawler.               │
-# │    .   *    .       humans should visit /         │
-# │      +   *          and try typing: sakura        │
-# │                                                   │
-# │  (see also: /humans.txt)                          │
-# └──────────────────────────────────────────────────┘
+# zachbrewer.com
+# one line, four crafts. humans: visit / and turn the sound on.
+# (see also: /humans.txt)
 
 User-agent: *
 Allow: /$
