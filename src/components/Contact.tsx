@@ -244,6 +244,11 @@ export default function Contact({ onOpenResume }: { onOpenResume: () => void }) 
               </button>
             </li>
             <li>
+              <a className="pill" href="/playground/">
+                Playground
+              </a>
+            </li>
+            <li>
               <button type="button" className="pill" onClick={() => setSoundOn(!sound)} aria-pressed={sound}>
                 <span className={`eq${sound ? ' is-on' : ''}`} aria-hidden="true">
                   <i />

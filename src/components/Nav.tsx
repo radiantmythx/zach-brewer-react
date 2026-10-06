@@ -10,6 +10,8 @@ import { useActiveSection } from '../lib/scroll'
 
 interface NavProps {
   onResumeClick: () => void
+  /** which page the nav sits on; section links point home from the Playground */
+  page?: 'home' | 'playground'
 }
 
 export function Mark() {
@@ -25,10 +27,12 @@ export function Mark() {
   )
 }
 
-export default function Nav({ onResumeClick }: NavProps) {
+export default function Nav({ onResumeClick, page = 'home' }: NavProps) {
   const [hidden, setHidden] = useState(false)
-  const active = useActiveSection()
+  const section = useActiveSection()
+  const active = page === 'home' ? section : null
   const cls = (id: string, extra = '') => `link-u${extra}${active === id ? ' is-active' : ''}`
+  const href = (id: string) => (page === 'home' ? `#${id}` : `/#${id}`)
 
   useEffect(() => {
     let last = window.scrollY
@@ -44,21 +48,28 @@ export default function Nav({ onResumeClick }: NavProps) {
 
   return (
     <header className={`nav${hidden ? ' is-hidden' : ''}`} onFocus={() => setHidden(false)}>
-      <a href="#top" className="nav-mark" aria-label="Zach Brewer — back to top">
+      <a href={page === 'home' ? '#top' : '/'} className="nav-mark" aria-label={page === 'home' ? 'Zach Brewer — back to top' : 'Zach Brewer — home'}>
         <Mark />
         <span>Zach Brewer</span>
       </a>
       <nav className="nav-links" aria-label="Primary">
-        <a className={cls('about', ' nav-optional')} href="#about" aria-current={active === 'about' ? 'location' : undefined}>
+        <a className={cls('about', ' nav-optional')} href={href('about')} aria-current={active === 'about' ? 'location' : undefined}>
           About
         </a>
-        <a className={cls('disciplines', ' nav-optional')} href="#disciplines" aria-current={active === 'disciplines' ? 'location' : undefined}>
+        <a className={cls('disciplines', ' nav-optional')} href={href('disciplines')} aria-current={active === 'disciplines' ? 'location' : undefined}>
           Disciplines
         </a>
-        <a className={cls('experience', ' nav-optional')} href="#experience" aria-current={active === 'experience' ? 'location' : undefined}>
+        <a className={cls('experience', ' nav-optional')} href={href('experience')} aria-current={active === 'experience' ? 'location' : undefined}>
           Experience
         </a>
-        <a className={cls('contact')} href="#contact" aria-current={active === 'contact' ? 'location' : undefined}>
+        <a
+          className={`link-u${page === 'playground' ? ' is-active' : ''}`}
+          href="/playground/"
+          aria-current={page === 'playground' ? 'page' : undefined}
+        >
+          Playground
+        </a>
+        <a className={cls('contact')} href={href('contact')} aria-current={active === 'contact' ? 'location' : undefined}>
           Contact
         </a>
         <button type="button" className="nav-cta" onClick={onResumeClick}>

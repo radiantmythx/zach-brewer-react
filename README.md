@@ -65,14 +65,62 @@ state is shared by one passive listener in `src/lib/scroll.ts`.
 Everything is server-rendered visible and animates in on the client.
 Reduced motion turns the motion off.
 
+## The Playground (`/playground/`, `src/playground/`)
+
+A second pre-rendered page: a sketchbook of experiments made with AI as a
+collaborator. It has one long showcase piece, twelve motion studies and twelve
+small games after golden-age arcade classics, all drawn live in Canvas 2D in the
+site's linework language. Cards preview each piece live while it is on screen,
+and a full-frame viewer adds keyboard, touch and optional sound. Viewer links are
+shareable (`/playground/#golden-angle`), and the back button closes the viewer.
+
+| File | Role |
+| --- | --- |
+| `types.ts` | The piece contract: `CreatePiece(env) → { frame, resize, pointer, key, destroy }` |
+| `Stage.tsx` | Hosts one piece on one canvas: DPR, resize, loop (~30 fps in previews), pausing, input, errors |
+| `kit.ts` | Palette, type, math, seeded rng, simplex/curl noise, easing, linework helpers, game chrome (`gameFit`, `gameFrame`, `gameHud`, `card`), input (`Keys`, `Touch`) |
+| `sfx.ts` | One lazy AudioContext, a soft bus with a small room, `tone`/`noise` voices, the persisted sound toggle |
+| `registry.ts` | What's listed and in what order (metadata only; code is split per piece via `loaders.ts`) |
+| `Card.tsx`, `Viewer.tsx`, `PlaygroundApp.tsx` | The page |
+| `showcase/golden-angle.ts` | S.01: phyllotaxis in six chapters, a pure function of time that loops seamlessly |
+| `motion/*.ts` | M.01–M.12: attention, diffusion, a network training live, flow, attractors, kinetic type, gradient descent, latent space, murmuration, epicycles, interference, automata |
+| `games/*.ts` | G.01–G.12, each with an attract-mode bot. `games/_template.ts` is the reference game |
+| `guide.ts`, `guides/*.ts` | The notes for each piece (a long read: the phenomenon, the maths, how it works, liberties taken, further reading), its controls, and its touch pad. Loaded when a viewer opens |
+| `notes/` | The notes reader (`Notes.tsx`), a small TeX-subset typesetter and inline markup (`format.ts`), the controls legend and the on-screen touch pad |
+
+**Golden Angle.** Seeds are placed by Vogel's model: seed *i* sits at radius
+c·√i and angle i·θ. The turn steps through the convergents of 1/φ² (1/2, 1/3,
+2/5, 3/8, 5/13, 8/21, 13/34), which give 2, 3, 5, 8, 13, 21 and 34 spokes. It then
+locks on 1/φ², where the 21 and 34 spirals draw themselves. A flower blooms and
+goes to seed, the wind (your pointer) carries the seeds, a meadow grows, and the
+camera dives into one flower's centre until a single seed is left, which is the
+first frame. With sound on, each seed is a note pitched from its angle, so
+rational turns repeat and the golden turn never does.
+
+**Notes and controls.** Every piece has a guide in `guides/<id>.ts`. The viewer's
+*Notes* button (or `/playground/#<id>/notes`) opens it beside the running piece
+on wide screens, or as a sheet on phones. The viewer's footer shows the controls
+as keycaps and gesture icons. On touch screens, games show an on-screen pad whose
+buttons press and release real key codes through the Stage. The viewer and the
+games also have layouts for very short screens, such as a phone on its side: the
+pads sit either side of the stage, and `kit.gameFit` reports `compact` or `side`
+so HUDs condense or move into the margins.
+
+**Testing a piece.** `/playground/?solo=games/stack&mode=full&t=6` renders one piece
+full-bleed and steps it deterministically to `t` seconds, then freezes it.
+`&mode=preview&w=420&h=315` renders it at card size, and other params reach the piece
+(`&state=play&bot=1` lets a game's bot play; `&at=57` seeks Golden Angle). This
+works with headless Chrome or Edge `--screenshot`.
+
 ## Pre-rendering (SEO)
 
 `npm run build` runs three steps:
 
-1. `vite build`: client bundle + `dist/index.html` template (contains `<!--app-html-->`)
+1. `vite build`: client bundles + two HTML templates, `dist/index.html` and
+   `dist/playground/index.html` (each contains `<!--app-html-->`)
 2. `vite build --ssr src/entry-server.tsx`: a server bundle in `dist/server`
-3. `node scripts/prerender.mjs`: renders the app to HTML, injects it into
-   `dist/index.html`, and removes the temporary server bundle
+3. `node scripts/prerender.mjs`: renders each page to HTML (`render(url)`), injects
+   it into its template, and removes the temporary server bundle
 
 The client hydrates the pre-rendered markup, or renders from scratch in dev,
 where the template is empty. The résumé modal (and pdfjs) is `lazy()`-loaded

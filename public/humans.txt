@@ -24,6 +24,10 @@ Rendering: pre-rendered static HTML + hydration
 Type: Instrument Serif, Geist, Geist Mono
 Details: scroll ruler, construction dividers, callouts, a career
          ruler, and a colophon with a layout grid you can show with G
+Playground: /playground/, made with AI as a collaborator.
+            Golden Angle (phyllotaxis in six chapters), twelve
+            motion studies, twelve games after 1980s arcade classics,
+            each with a small bot that plays the attract mode
 
 /* STANDARDS */
 Accessibility: reduced motion respected (the reel starts

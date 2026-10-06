@@ -283,6 +283,12 @@ button {
   }
 }
 
+@media (max-width: 440px) {
+  .nav-mark span {
+    display: none;
+  }
+}
+
 /* ------------------------------------------------------------------ hero */
 
 .hero {
