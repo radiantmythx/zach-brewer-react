@@ -6,7 +6,7 @@ import type { CreatePiece } from './types'
  * New files are picked up automatically (handy for the solo test route).
  */
 
-const mods = import.meta.glob<{ default: CreatePiece }>(['./motion/*.ts', './games/*.ts', './showcase/*.ts'])
+const mods = import.meta.glob<{ default: CreatePiece }>(['./motion/*.ts', './color/*.ts', './space/*.ts', './time/*.ts', './games/*.ts', './showcase/*.ts'])
 
 export function loaderFor(key: string): (() => Promise<{ default: CreatePiece }>) | undefined {
   return mods[`./${key}.ts`]

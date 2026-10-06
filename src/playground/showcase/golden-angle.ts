@@ -1,5 +1,5 @@
 /*
- * S.01 — GOLDEN ANGLE
+ * F.01 — GOLDEN ANGLE
  *
  * Place each seed a fixed turn from the last (Vogel's model: seed i at
  * radius c·√i, angle i·θ). Any simple fraction of a turn stacks the seeds
@@ -619,7 +619,7 @@ const create: CreatePiece = (env) => {
     const small = preview || Math.min(w, h) < 480
     if (!preview) env.setCursor(hoverX >= 0 ? 'pointer' : T > 66 && T < DIVE0 - 1 ? 'crosshair' : 'default')
     // kicker, top-left
-    text(ctx, 'S.01 — Golden angle', pad, pad + 10, { size: small ? 9 : 10, color: k.muted, tracking: 0.16, upper: true })
+    text(ctx, 'F.01 — Golden angle', pad, pad + 10, { size: small ? 9 : 10, color: k.muted, tracking: 0.16, upper: true })
     const c = CHAPTERS[ch]
     const kIn = ease.outExpo(clamp((T - c.t - 0.2) / 0.8)) * (ch === CHAPTERS.length - 1 ? 1 - smoothstep(93, 94.2, T) : 1)
     ctx.save()

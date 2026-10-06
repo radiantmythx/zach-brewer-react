@@ -68,9 +68,13 @@ Reduced motion turns the motion off.
 ## The Playground (`/playground/`, `src/playground/`)
 
 A second pre-rendered page: a sketchbook of experiments made with AI as a
-collaborator. It has one long showcase piece, twelve motion studies and twelve
-small games after golden-age arcade classics, all drawn live in Canvas 2D in the
-site's linework language. Cards preview each piece live while it is on screen,
+collaborator. It has 55 pieces, all drawn live in Canvas 2D in the site's linework
+language, and arranged in shelves:
+
+- the showcase, Golden Angle
+- Motion: twelve studies
+- Color, Space and Time: ten studies each
+- Arcade: twelve small games after golden-age arcade classics Cards preview each piece live while it is on screen,
 and a full-frame viewer adds keyboard, touch and optional sound. Viewer links are
 shareable (`/playground/#golden-angle`), and the back button closes the viewer.
 
@@ -80,10 +84,14 @@ shareable (`/playground/#golden-angle`), and the back button closes the viewer.
 | `Stage.tsx` | Hosts one piece on one canvas: DPR, resize, loop (~30 fps in previews), pausing, input, errors |
 | `kit.ts` | Palette, type, math, seeded rng, simplex/curl noise, easing, linework helpers, game chrome (`gameFit`, `gameFrame`, `gameHud`, `card`), input (`Keys`, `Touch`) |
 | `sfx.ts` | One lazy AudioContext, a soft bus with a small room, `tone`/`noise` voices, the persisted sound toggle |
-| `registry.ts` | What's listed and in what order (metadata only; code is split per piece via `loaders.ts`) |
+| `registry.ts` | What's listed, in which shelf and order (metadata only; code is split per piece via `loaders.ts`) |
 | `Card.tsx`, `Viewer.tsx`, `PlaygroundApp.tsx` | The page |
-| `showcase/golden-angle.ts` | S.01: phyllotaxis in six chapters, a pure function of time that loops seamlessly |
+| `showcase/golden-angle.ts` | F.01: phyllotaxis in six chapters, a pure function of time that loops seamlessly |
 | `motion/*.ts` | M.01–M.12: attention, diffusion, a network training live, flow, attractors, kinetic type, gradient descent, latent space, murmuration, epicycles, interference, automata |
+| `color/*.ts` | C.01–C.10: spectrum, blue hour, afterimage, light and ink, interaction (after Albers), soap film, sea glow, blackbody, pigments, three cones |
+| `space/*.ts` | S.01–S.10: equal areas (Kepler), scale (powers of ten), event horizon, redshift, Orion in depth, Lagrange, fourth dimension, territories (Voronoi), chirp (GW150914), star trails |
+| `time/*.ts` | T.01–T.10: pendulum wave, tide, arrow of time, half-life, deep time, escapement, synchrony, light clock, tree rings, analemma |
+| `color.ts` | Shared colour science: the CIE 1931 colour-matching table, XYZ ↔ sRGB, spectral colours, Planck blackbody colours, OKLab/OKLCH (with a chroma-preserving gamut fit) |
 | `games/*.ts` | G.01–G.12, each with an attract-mode bot. `games/_template.ts` is the reference game |
 | `guide.ts`, `guides/*.ts` | The notes for each piece (a long read: the phenomenon, the maths, how it works, liberties taken, further reading), its controls, and its touch pad. Loaded when a viewer opens |
 | `notes/` | The notes reader (`Notes.tsx`), a small TeX-subset typesetter and inline markup (`format.ts`), the controls legend and the on-screen touch pad |

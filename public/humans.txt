@@ -26,8 +26,9 @@ Details: scroll ruler, construction dividers, callouts, a career
          ruler, and a colophon with a layout grid you can show with G
 Playground: /playground/, made with AI as a collaborator.
             Golden Angle (phyllotaxis in six chapters), twelve
-            motion studies, twelve games after 1980s arcade classics,
-            each with a small bot that plays the attract mode
+            motion studies, ten studies each in color, space and
+            time, and twelve games after 1980s arcade classics,
+            each with a long read on how it works
 
 /* STANDARDS */
 Accessibility: reduced motion respected (the reel starts

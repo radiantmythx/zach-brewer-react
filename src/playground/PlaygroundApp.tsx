@@ -2,16 +2,24 @@ import { Suspense, lazy, useCallback, useEffect, useRef, useState, type CSSPrope
 import Nav from '../components/Nav'
 import BackToTop from '../components/ux/BackToTop'
 import Divider from '../components/ux/Divider'
+import ScrollRuler from '../components/ux/ScrollRuler'
 import GridOverlay from '../components/ux/GridOverlay'
 import Magnetic from '../components/ux/Magnetic'
 import Card from './Card'
-import { ALL, GAMES, MOTION, SHOWCASE } from './registry'
+import { ALL, SHELVES, SHOWCASE } from './registry'
 import { getSound, sfxEngine } from './sfx'
 import Viewer from './Viewer'
 
 const ResumeModal = lazy(() => import('../components/Resume'))
 
 const CHAPTERS = ['A turn', 'Close is not enough', 'The golden angle', 'Bloom', 'Wind', 'Begin again']
+
+const RULER = [
+  { id: 'top', label: 'Playground', index: '00' },
+  { id: 'showcase', label: 'Showcase', index: '01' },
+  ...SHELVES.map((s) => ({ id: s.id, label: s.label, index: s.index })),
+]
+const TOTAL = ALL.length
 
 /** '#stack' → { id: 'stack', notes: false }, '#stack/notes' → notes open */
 const fromHash = () => {
@@ -106,13 +114,13 @@ export default function PlaygroundApp() {
           </h1>
           <div className="pg-hero-grid">
             <p className="pg-lede">
-              A sketchbook of experiments made with AI as a collaborator: twelve motion studies, twelve small games after the arcade classics of the
-              1980s, and one long piece about how a single number grows a flower.
+              A sketchbook of experiments made with AI as a collaborator: forty-two studies in motion, color, space and time, twelve small games
+              after the arcade classics of the 1980s, and one long piece about how a single number grows a flower.
             </p>
             <dl className="pg-facts">
               <div>
                 <dt>Pieces</dt>
-                <dd>25</dd>
+                <dd>{TOTAL}</dd>
               </div>
               <div>
                 <dt>Notes</dt>
@@ -132,12 +140,12 @@ export default function PlaygroundApp() {
             <a className="link-u" href="#showcase">
               <span>01</span> Showcase
             </a>
-            <a className="link-u" href="#motion">
-              <span>02</span> Motion studies
-            </a>
-            <a className="link-u" href="#arcade">
-              <span>03</span> Arcade
-            </a>
+            {SHELVES.map((sh) => (
+              <a key={sh.id} className="link-u" href={`#${sh.id}`}>
+                <span>{sh.index}</span> {sh.label}
+                <em>{sh.entries.length}</em>
+              </a>
+            ))}
           </nav>
         </header>
 
@@ -174,47 +182,29 @@ export default function PlaygroundApp() {
           </div>
         </section>
 
-        <Divider index="02" label="Twelve studies" />
-        <section id="motion" className="section pg-section">
-          <div className="container">
-            <div className="pg-section-head">
-              <p className="label">(02) Motion</p>
-              <h2 className="pg-section-title">
-                Motion <em>studies</em>
-              </h2>
-              <p className="pg-section-lede">
-                Twelve short pieces, each on its own idea. Five look at how machine learning works (attention, diffusion, training, optimization,
-                embeddings); the rest are mathematics, nature and type.
-              </p>
-            </div>
-            <div className="pg-grid">
-              {MOTION.map((e, i) => (
-                <Card key={e.id} entry={e} onOpen={open} paused={viewing} style={{ '--i': i % 3 } as CSSProperties} />
-              ))}
-            </div>
+        {SHELVES.map((sh) => (
+          <div key={sh.id} className="pg-shelf" data-shelf={sh.id}>
+            <Divider index={sh.index} label={sh.divider} />
+            <section id={sh.id} className="section pg-section">
+              <div className="container">
+                <div className="pg-section-head">
+                  <p className="label">
+                    ({sh.index}) {sh.label}
+                  </p>
+                  <h2 className="pg-section-title">
+                    {sh.title[0]} <em>{sh.title[1]}</em>
+                  </h2>
+                  <p className="pg-section-lede">{sh.lede}</p>
+                </div>
+                <div className="pg-grid">
+                  {sh.entries.map((e, i) => (
+                    <Card key={e.id} entry={e} onOpen={open} paused={viewing} style={{ '--i': i % 3 } as CSSProperties} />
+                  ))}
+                </div>
+              </div>
+            </section>
           </div>
-        </section>
-
-        <Divider index="03" label="After the arcade" />
-        <section id="arcade" className="section pg-section">
-          <div className="container">
-            <div className="pg-section-head">
-              <p className="label">(03) Arcade</p>
-              <h2 className="pg-section-title">
-                Small <em>games</em>
-              </h2>
-              <p className="pg-section-lede">
-                Twelve games after the golden age of the arcade, 1978 to 1986, drawn in hairline. Each one runs an attract mode: a small bot plays
-                until you take over.
-              </p>
-            </div>
-            <div className="pg-grid">
-              {GAMES.map((e, i) => (
-                <Card key={e.id} entry={e} onOpen={open} paused={viewing} style={{ '--i': i % 3 } as CSSProperties} />
-              ))}
-            </div>
-          </div>
-        </section>
+        ))}
 
         <footer className="pg-foot container">
           <p>
@@ -232,6 +222,7 @@ export default function PlaygroundApp() {
         <i />
         <i />
       </div>
+      <ScrollRuler sections={RULER} />
       <BackToTop />
       <GridOverlay />
       <Magnetic />
