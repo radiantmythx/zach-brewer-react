@@ -1,0 +1,2 @@
+const __vite__mapDeps=(i,m=__vite__mapDeps,d=(m.f||(m.f=["_astro/cover.Co-Pt1zc.js","_astro/three.module.l1fCDnU0.js","_astro/runtime.C65M4I6B.js","_astro/ripples.EyJ0M9xB.js","_astro/cover-shader.CMG_DAJK.js"])))=>i.map(i=>d[i]);
+import{t as e}from"./ui.SVuuoct7.js";import{n as t,r as n,t as r}from"./preload-helper.DNGw3FUm.js";function i(){e();let i=document.querySelector(`[data-gl-cover]`);i&&t()&&n(()=>r(()=>import(`./cover.Co-Pt1zc.js`).then(e=>e.mountCover(i)),__vite__mapDeps([0,1,2,3,4])))}document.addEventListener(`astro:page-load`,i);

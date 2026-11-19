@@ -1,6 +1,7 @@
 import { useEffect, useState } from 'react'
 import { LOGO } from '../film/logo'
 import { useActiveSection } from '../lib/scroll'
+import Demos from './Demos'
 
 /*
  * Minimal fixed nav. mix-blend-mode: difference keeps it legible on the dark
@@ -69,6 +70,7 @@ export default function Nav({ onResumeClick, page = 'home' }: NavProps) {
         >
           Playground
         </a>
+        <Demos />
         <a className={cls('contact')} href={href('contact')} aria-current={active === 'contact' ? 'location' : undefined}>
           Contact
         </a>

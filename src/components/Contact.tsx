@@ -1,5 +1,6 @@
 import { useEffect, useRef, useState } from 'react'
 import { pluck, setSoundOn, subscribeSound } from '../film/sound'
+import Demos from './Demos'
 import Reveal, { Lines } from './Reveal'
 import Colophon from './ux/Colophon'
 
@@ -247,6 +248,9 @@ export default function Contact({ onOpenResume }: { onOpenResume: () => void }) 
               <a className="pill" href="/playground/">
                 Playground
               </a>
+            </li>
+            <li>
+              <Demos variant="pill" />
             </li>
             <li>
               <button type="button" className="pill" onClick={() => setSoundOn(!sound)} aria-pressed={sound}>

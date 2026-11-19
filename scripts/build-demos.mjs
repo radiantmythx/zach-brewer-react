@@ -6,6 +6,12 @@ import { fileURLToPath } from 'node:url'
 const __filename = fileURLToPath(import.meta.url)
 const __dirname = dirname(__filename)
 
+// Usage:
+//   npm run build:demo                         rebuild every demo (unchanged behaviour)
+//   npm run build:demo -- --only <folder>      rebuild only ../demo-sites/<folder>
+const onlyFlag = process.argv.indexOf('--only')
+const only = onlyFlag > -1 ? process.argv[onlyFlag + 1] : process.argv.find((a) => a.startsWith('--only='))?.slice(7)
+
 const siteRoot = resolve(__dirname, '..')
 const codeRoot = resolve(siteRoot, '..')
 const publicRoot = resolve(siteRoot, 'public')
@@ -53,20 +59,22 @@ function buildViteDemo(projectFolderName, destinationFolderName) {
   rewriteRootUrls(resolve(destinationPath, 'index.html'), `/${destinationFolderName}/`)
 }
 
-buildViteDemo('survivor-react-engine', 'demo')
+if (!only) {
+  buildViteDemo('survivor-react-engine', 'demo')
 
-copyFreshDir(
-  resolve(codeRoot, 'equalization-anywhere-plugin', 'site'),
-  resolve(publicRoot, 'demo-equalization-anywhere'),
-)
+  copyFreshDir(
+    resolve(codeRoot, 'equalization-anywhere-plugin', 'site'),
+    resolve(publicRoot, 'demo-equalization-anywhere'),
+  )
 
-copyFreshDir(
-  resolve(codeRoot, 'equalization-anywhere-plugin', 'shared'),
-  resolve(publicRoot, 'shared'),
-)
+  copyFreshDir(
+    resolve(codeRoot, 'equalization-anywhere-plugin', 'shared'),
+    resolve(publicRoot, 'shared'),
+  )
 
-buildViteDemo('nitro-type', 'demo-nitro-type')
-buildViteDemo('timing-trainer', 'demo-timing-trainer')
+  buildViteDemo('nitro-type', 'demo-nitro-type')
+  buildViteDemo('timing-trainer', 'demo-timing-trainer')
+}
 
 // ─── Demo Sites ──────────────────────────────────────────────────────────────
 // Auto-discovers all sub-folders in ../demo-sites/ that have a build script
@@ -75,7 +83,7 @@ buildViteDemo('timing-trainer', 'demo-timing-trainer')
 // To add a new demo site:
 //   1. Drop a Vite project into ../demo-sites/<your-project>/
 //   2. Ensure it has a "build" npm script
-//   3. Run `npm run build:demos` from this repo
+//   3. Run `npm run build:demo` from this repo (add `-- --only <folder>` for just one)
 //   4. Commit the generated public/demo-sites/<your-project>/ output
 // ─────────────────────────────────────────────────────────────────────────────
 
@@ -107,13 +115,20 @@ function buildDemoSite(folderName) {
 
 if (existsSync(demoSitesRoot)) {
   const entries = readdirSync(demoSitesRoot, { withFileTypes: true })
+  let built = 0
   for (const entry of entries) {
     if (!entry.isDirectory()) continue
+    if (only && entry.name !== only) continue
     const pkgPath = resolve(demoSitesRoot, entry.name, 'package.json')
     if (!existsSync(pkgPath)) continue
     const pkg = JSON.parse(readFileSync(pkgPath, 'utf8'))
     if (!pkg.scripts?.build) continue
     buildDemoSite(entry.name)
+    built++
+  }
+  if (only && built === 0) {
+    console.error(`[demo-sites] No demo site "${only}" with a build script in ../demo-sites/.`)
+    process.exit(1)
   }
 } else {
   console.log('[demo-sites] No demo-sites directory found, skipping.')
